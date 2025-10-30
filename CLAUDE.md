@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Claude Code Skills & Workflow
+
+### Smart Clarifier Skill
+
+**CRITICAL: When using the `smart-clarifier` skill, you MUST use the `AskUserQuestion` tool to present questions.**
+
+- **Never** output clarifying questions as plain text
+- **Always** use the `AskUserQuestion` tool with proper structure:
+  - Present 2-3 questions using the tool
+  - Each question should have 2-4 concrete options
+  - Include your recommendation for each question
+  - Set appropriate `multiSelect` values
+
+**Example Pattern:**
+```
+When smart-clarifier skill activates:
+1. Analyze the feature request
+2. Identify 2-3 critical questions
+3. Call AskUserQuestion tool with structured options
+4. Wait for user response
+5. Proceed with implementation
+```
+
+**Why this matters:** The `AskUserQuestion` tool provides a much better UX with clickable options, prevents misunderstandings, and ensures consistent question formatting.
+
 ## Essential Commands
 
 ### Development
