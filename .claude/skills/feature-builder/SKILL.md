@@ -1,99 +1,83 @@
 ---
 name: feature-builder
-description: Use after clarifying requirements to plan and implement new features. Designs architecture that integrates with existing auth/database/AI systems, creates necessary database tables, builds API routes and UI components, and ensures everything works together. Focuses on producing working code rather than tests or documentation.
+description: Orchestrates full-stack feature implementation using Next.js 15 App Router patterns, Better Auth, Drizzle ORM, and shadcn/ui. Designs data models, creates authenticated API routes, builds UI components. Integrates with existing auth/database/AI systems. Focuses on producing working code following project patterns. Activates after requirements are clarified.
 ---
 
 # Feature Builder
 
-This skill guides you through planning and implementing features that integrate seamlessly with the starter kit's existing authentication, database, and AI capabilities.
+Guides full-stack feature implementation that integrates seamlessly with the starter kit's existing authentication, database, and AI capabilities.
 
 ## Activation
 
 Use this skill after:
-- Clarifying requirements (smart-clarifier has run)
+- smart-clarifier has gathered requirements
 - User confirms they want to proceed with implementation
-- You have clear understanding of what to build
+- Clear understanding of what to build exists
 
 ## Implementation Workflow
 
-### Phase 1: Plan the Architecture
+### Phase 1: Plan Architecture (Don't Code Yet!)
 
-Before writing code, create a clear mental model of:
+Before writing any code, plan:
 
-#### 1. Data Model
-**Questions to answer:**
+**Data Model:**
 - What database tables are needed?
-- What fields and relationships?
-- How does it relate to existing `user` table?
-- Should records cascade delete with user?
+- Fields and their types?
+- Relationships to existing `user` table?
+- Should records cascade delete when user is deleted?
+- Indexes needed for performance?
 
-**Example:**
-```
-Task Management App:
-- tasks table: id, user_id, title, description, status, due_date, created_at
-- Relationship: tasks.user_id → user.id (cascade delete)
-- Indexes: user_id for fast user queries
-```
-
-#### 2. API Routes
-**Questions to answer:**
-- What API endpoints are needed?
+**API Routes:**
+- What endpoints are needed?
+- HTTP methods (GET, POST, PUT, DELETE)?
 - Which need authentication?
-- What HTTP methods (GET, POST, PUT, DELETE)?
-- Request/response shapes?
+- Request and response shapes?
 
-**Example:**
-```
-Tasks API:
-- GET /api/tasks - List user's tasks (authenticated)
-- POST /api/tasks - Create task (authenticated)
-- PUT /api/tasks/[id] - Update task (authenticated)
-- DELETE /api/tasks/[id] - Delete task (authenticated)
-```
-
-#### 3. Pages & UI
-**Questions to answer:**
-- What pages/routes are needed?
+**UI Pages & Components:**
+- What routes/pages are needed?
 - Which are protected (require auth)?
 - What shadcn/ui components to use?
-- Layout structure?
+- Server components vs client components?
 
-**Example:**
-```
-Task Pages:
-- /tasks - Task list page (protected)
-- /tasks/[id] - Task detail page (protected)
-
-Components:
-- TaskList (uses Card, Button from shadcn)
-- TaskForm (uses Input, Textarea, Select from shadcn)
-- TaskItem (uses Checkbox, Badge from shadcn)
-```
-
-#### 4. Integration Points
-**Questions to answer:**
-- How does this use authentication?
-- Does it need AI features?
+**Integration Points:**
+- How does this use Better Auth?
+- Does it need AI features (OpenAI)?
+- External APIs or services?
 - Real-time updates needed?
-- External services?
 
-**Example:**
+**Example Plan:**
 ```
-Integrations:
+Task Management Feature:
+
+Data Model:
+- tasks table: id, user_id, title, description, status, due_date, created_at, updated_at
+- Relationship: tasks.user_id → user.id (cascade delete)
+
+API Routes:
+- GET /api/tasks - List user's tasks
+- POST /api/tasks - Create task
+- PUT /api/tasks/[id] - Update task
+- DELETE /api/tasks/[id] - Delete task
+All routes require authentication.
+
+UI:
+- /tasks - Task list page (protected)
+- Components: TaskList (client), TaskForm (client), TaskItem (client)
+- Use shadcn: Card, Button, Input, Textarea, Checkbox
+
+Integration:
 - Auth: All routes check session, filter by user_id
-- AI: Optional AI task suggestions using OpenAI
-- Real-time: No (standard request/response is fine)
+- AI: Optional - AI task suggestions feature
+- Real-time: No (standard request/response)
 ```
 
 ### Phase 2: Database Setup
 
-#### Step 1: Define Schema
-
-Add table definitions to `src/lib/schema.ts`:
+**Step 1: Define Schema in `src/lib/schema.ts`**
 
 ```typescript
-import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
-import { user } from "./schema";
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { user } from "./schema"; // Import existing tables if needed
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -102,50 +86,48 @@ export const tasks = pgTable("tasks", {
     .notNull(),
   title: text("title").notNull(),
   description: text("description"),
-  status: text("status").notNull().default("todo"), // todo, in_progress, done
+  status: text("status").notNull().default("todo"),
   dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 ```
 
-**Key patterns:**
-- Use UUID for IDs: `uuid("id").defaultRandom().primaryKey()`
+**Key Patterns:**
+- UUID primary keys: `uuid("id").defaultRandom().primaryKey()`
 - Foreign keys with cascade: `references(() => user.id, { onDelete: "cascade" })`
 - Timestamps: `timestamp("created_at").defaultNow().notNull()`
-- Status enums: Use text with validation in API layer
+- Not null constraints: `.notNull()`
 
-#### Step 2: Push Schema Changes
+**Step 2: Push Schema Changes**
 
-For development iteration:
+For development (fast iteration):
 ```bash
 npm run db:push
 ```
 
-For production-ready migrations:
+For production (with migration files):
 ```bash
 npm run db:generate
 npm run db:migrate
 ```
 
-**Use `db:push` during feature development** - it's faster and you can iterate quickly.
+**Use `db:push` during feature development** - it's faster for iteration.
 
 ### Phase 3: Build API Routes
 
-Create API routes in `src/app/api/[feature-name]/`:
-
-#### Pattern: Authenticated API Route
+**Pattern: Authenticated API Route**
 
 ```typescript
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  // Check authentication
+  // 1. Check authentication
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -155,7 +137,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Query user's data only
+    // 2. Query user's data only (CRITICAL: filter by user ID)
     const userTasks = await db
       .select()
       .from(tasks)
@@ -170,7 +152,11 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+```
 
+**Pattern: POST with Validation**
+
+```typescript
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -182,9 +168,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, description, dueDate } = body;
+    const { title, description } = body;
 
-    // Validate
+    // Validate input
     if (!title || title.trim().length === 0) {
       return NextResponse.json(
         { error: "Title is required" },
@@ -192,14 +178,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert
+    // Insert with user ownership
     const [newTask] = await db
       .insert(tasks)
       .values({
         userId: session.user.id,
         title: title.trim(),
         description: description?.trim() || null,
-        dueDate: dueDate ? new Date(dueDate) : null,
       })
       .returning();
 
@@ -214,19 +199,11 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-**Key patterns:**
-- Always check `session` first
-- Always filter by `session.user.id` for user-specific data
-- Validate input before database operations
-- Use try/catch for error handling
-- Return appropriate status codes
-- Log errors for debugging
-
-#### Pattern: Dynamic API Route (with ID)
-
-For routes like `/api/tasks/[id]/route.ts`:
+**Pattern: Update with Ownership Check**
 
 ```typescript
+import { and } from "drizzle-orm";
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -241,19 +218,18 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { title, description, status, dueDate } = body;
 
     // Update only if owned by user (security check)
     const [updated] = await db
       .update(tasks)
       .set({
-        title: title?.trim(),
-        description: description?.trim(),
-        status,
-        dueDate: dueDate ? new Date(dueDate) : null,
+        ...body,
         updatedAt: new Date(),
       })
-      .where(and(eq(tasks.id, params.id), eq(tasks.userId, session.user.id)))
+      .where(and(
+        eq(tasks.id, params.id),
+        eq(tasks.userId, session.user.id)  // CRITICAL: ownership check
+      ))
       .returning();
 
     if (!updated) {
@@ -274,11 +250,18 @@ export async function PUT(
 }
 ```
 
-**Security:** Always use `and()` to check both ID match AND user ownership.
+**API Route Checklist:**
+- ✓ Check session first (401 if not authenticated)
+- ✓ Validate all user input (400 for validation errors)
+- ✓ Filter queries by `session.user.id` for user-specific data
+- ✓ Use `and()` to check both ID match AND user ownership on updates/deletes
+- ✓ Handle errors with try/catch (500 for server errors)
+- ✓ Log errors for debugging
+- ✓ Return appropriate status codes
 
 ### Phase 4: Build UI Components
 
-#### Step 1: Create Protected Page
+**Step 1: Create Protected Page**
 
 ```typescript
 import { auth } from "@/lib/auth";
@@ -298,26 +281,24 @@ export default async function TasksPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">My Tasks</h1>
-      <TaskList userId={session.user.id} />
+      <TaskList />
     </main>
   );
 }
 ```
 
-#### Step 2: Build Client Components
+**Step 2: Build Client Components**
 
-Use shadcn/ui components and React hooks:
+Use "use client" for interactive components:
 
 ```typescript
 "use client";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-export function TaskList({ userId }: { userId: string }) {
+export function TaskList() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -331,173 +312,154 @@ export function TaskList({ userId }: { userId: string }) {
       const data = await res.json();
       setTasks(data.tasks);
     } catch (error) {
-      console.error("Error fetching tasks:", error);
+      console.error("Error:", error);
     } finally {
       setLoading(false);
     }
   }
 
-  async function createTask(title: string, description: string) {
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description }),
-      });
-      const data = await res.json();
-      setTasks([...tasks, data.task]);
-    } catch (error) {
-      console.error("Error creating task:", error);
-    }
-  }
-
-  if (loading) return <div>Loading tasks...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-4">
-      <TaskForm onSubmit={createTask} />
       {tasks.map((task) => (
-        <TaskItem key={task.id} task={task} />
+        <Card key={task.id}>
+          <CardHeader>
+            <CardTitle>{task.title}</CardTitle>
+          </CardHeader>
+          <CardContent>{task.description}</CardContent>
+        </Card>
       ))}
     </div>
   );
 }
 ```
 
-**Component patterns:**
-- Use "use client" for interactive components
-- Fetch data in useEffect or React Query
-- Handle loading and error states
-- Use shadcn/ui components for UI elements
-- Keep components focused and composable
+**Component Decision Tree:**
+- **Server Component** (default): Can fetch data, no interactivity
+- **Client Component** ("use client"): Needs useState, useEffect, onClick, onChange, etc.
 
-#### Step 3: Install Additional shadcn Components
-
-If you need components not yet installed:
-
+**Install shadcn/ui Components:**
 ```bash
-pnpm dlx shadcn@latest add [component-name]
+pnpm dlx shadcn@latest add card
+pnpm dlx shadcn@latest add button
+pnpm dlx shadcn@latest add input
+pnpm dlx shadcn@latest add form
 ```
 
-Common components:
-- `form` - Form handling with react-hook-form
-- `select` - Dropdown selects
-- `checkbox` - Checkboxes
-- `calendar` - Date picker
-- `toast` - Notifications
-- `tabs` - Tab navigation
+### Phase 5: Add AI Features (If Needed)
 
-### Phase 5: Add AI Features (Optional)
-
-If the feature needs AI, use the Vercel AI SDK:
+If the feature needs AI:
 
 ```typescript
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, streamText } from "ai";
 
+// CRITICAL: Always use environment variable
 const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
+// For simple text generation
 const result = await generateText({
   model: openai(model),
-  prompt: "Generate task suggestions based on: " + userInput,
+  prompt: "Your prompt here",
+});
+
+// For streaming responses
+const stream = streamText({
+  model: openai(model),
+  messages: [...],
 });
 ```
 
-**Always use `OPENAI_MODEL` environment variable**, never hardcode model names.
+**Follow the pattern in `src/app/api/chat/route.ts` for streaming chat.**
 
-### Phase 6: Final Steps
+### Phase 6: Quality Checks
 
-1. **Test the feature** - Make sure it works end-to-end
-2. **Run lint** - `npm run lint`
-3. **Run typecheck** - `npm run typecheck`
-4. **Fix any errors** - Address linting and type issues
+Before considering the feature complete:
 
-## Implementation Principles
+```bash
+npm run lint        # Fix all linting errors
+npm run typecheck   # Fix all type errors
+```
 
-### 1. Focus on Working Code
+**Don't skip this step.** These catches issues early.
 
-**Do:**
-- Build features that work
-- Handle errors gracefully
-- Validate user input
-- Provide good UX (loading states, error messages)
+## Security Checklist
 
-**Don't:**
-- Generate unit tests (unless requested)
-- Create extensive documentation
-- Build complex test suites
-- Over-engineer for future needs
+**CRITICAL - Review every feature:**
 
-### 2. Integrate with Existing Systems
+✓ **Authentication checks in all protected routes and API endpoints**
+  - Server pages: redirect if no session
+  - API routes: return 401 if no session
 
-**Always leverage:**
-- Better Auth for authentication
-- Existing user table and schema
-- Drizzle ORM patterns
-- shadcn/ui component library
-- Tailwind CSS styling
-- Path aliases (`@/`)
+✓ **User-specific data filtering**
+  - All queries filtered by `session.user.id`
+  - No user can access another user's data
 
-**Never:**
-- Build custom auth
-- Create new database connections
-- Reinvent UI components
-- Use different styling approaches
+✓ **Ownership verification on updates/deletes**
+  - Use `and(eq(table.id, id), eq(table.userId, session.user.id))`
+  - Return 404 if not found or not owned
 
-### 3. Keep It Simple
+✓ **Input validation**
+  - Validate all user input before database operations
+  - Trim strings, check required fields
+  - Return 400 with clear error messages
 
-**Prefer:**
-- Simple, readable code
-- Standard patterns
-- Existing components
-- Straightforward logic
+✓ **Error handling**
+  - Try/catch in all API routes
+  - Log errors server-side
+  - Return user-friendly messages (don't expose internals)
 
-**Avoid:**
-- Complex abstractions
-- Premature optimization
-- Over-engineering
-- Unnecessary dependencies
+## Core Principles
 
-### 4. Security First
+**1. Extend, Don't Rebuild**
+- Use Better Auth (don't build custom auth)
+- Use existing DB connection (don't create new one)
+- Use shadcn/ui components (don't build from scratch)
+- Follow existing patterns
 
-**Always:**
-- Check session in protected routes
-- Filter data by user ID
-- Validate user input
-- Use parameterized queries (Drizzle handles this)
-- Check ownership before update/delete operations
+**2. Simple Over Clever**
+- Straightforward code > complex abstractions
+- Standard patterns > creative solutions
+- Readable > concise
 
-**Never:**
-- Trust client input without validation
-- Expose other users' data
-- Skip authentication checks
-- Use raw SQL with string concatenation
+**3. Working Code Over Tests/Docs**
+- Focus on functionality first
+- Don't generate tests unless requested
+- Don't create extensive documentation unless requested
+- Working MVP > perfect implementation
+
+**4. Security First**
+- Always check authentication
+- Always filter by user ID
+- Always validate input
+- Always check ownership before update/delete
 
 ## Common Patterns Quick Reference
 
-### Protected Server Component
+**Protected Server Component:**
 ```typescript
 const session = await auth.api.getSession({ headers: await headers() });
 if (!session) redirect("/");
 ```
 
-### Protected API Route
+**Protected API Route:**
 ```typescript
 const session = await auth.api.getSession({ headers: await headers() });
 if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 ```
 
-### Database Query (User-Specific)
+**User-Specific Query:**
 ```typescript
 const data = await db.select().from(table).where(eq(table.userId, session.user.id));
 ```
 
-### Database Insert (User-Specific)
+**Insert with User Ownership:**
 ```typescript
-const [newRecord] = await db.insert(table).values({ userId: session.user.id, ...data }).returning();
+const [record] = await db.insert(table).values({ userId: session.user.id, ...data }).returning();
 ```
 
-### Database Update (With Ownership Check)
+**Update with Ownership Check:**
 ```typescript
 const [updated] = await db
   .update(table)
@@ -506,22 +468,18 @@ const [updated] = await db
   .returning();
 ```
 
-### Client Data Fetching
-```typescript
-useEffect(() => {
-  fetch("/api/endpoint")
-    .then(res => res.json())
-    .then(data => setState(data));
-}, []);
-```
+## After Implementation
+
+1. Test the feature end-to-end
+2. Run `npm run lint` and `npm run typecheck`
+3. Fix any errors
+4. Briefly explain what you built and how it integrates with existing systems
 
 ## Remember
 
-- **Plan before coding** - Think through data model, API, and UI
-- **Use what's there** - Leverage existing auth, db, UI components
-- **Security matters** - Always check auth and ownership
-- **Simple is better** - Straightforward code over clever abstractions
-- **Working code wins** - Focus on functionality, not tests/docs
-- **Lint and typecheck** - Always run before considering complete
-
-After implementation, briefly explain what you built and how it integrates with the existing system.
+- **Plan before coding** - Architecture first, implementation second
+- **Use what's there** - Leverage existing auth, DB, UI patterns
+- **Security matters** - Check auth and ownership everywhere
+- **Simple is better** - Straightforward code wins
+- **Working code first** - Functionality over tests/docs
+- **Quality checks** - Always lint and typecheck before done

@@ -1,45 +1,38 @@
 ---
 name: starter-kit-intelligence
-description: Use when building features for this Next.js starter kit. Provides deep knowledge of the existing tech stack (Next.js 15, Better Auth, Drizzle ORM, PostgreSQL, Vercel AI SDK, OpenAI, shadcn/ui), project structure, integration patterns, and how to properly extend the application with new features that work seamlessly with existing authentication, database, and AI capabilities.
+description: Deep knowledge of Next.js 15 App Router, Better Auth, Drizzle ORM with PostgreSQL, Vercel AI SDK with OpenAI, and shadcn/ui integration patterns. Use when extending authentication, database schema, AI features, or understanding how existing systems are configured. Provides integration patterns and project structure guidance for this starter kit.
 ---
 
 # Starter Kit Intelligence
 
-You are working with a Next.js agentic coding starter kit that comes pre-configured with authentication, database, and AI capabilities. This skill provides you with deep knowledge of the project structure and patterns.
+Knowledge of this Next.js agentic coding starter kit's tech stack, project structure, and integration patterns.
 
-## Tech Stack
+## Tech Stack Overview
 
-### Core Framework
-- **Next.js 15** with App Router
-- **React 19**
-- **TypeScript** (strict mode)
-- **Turbopack** for development
+**Framework:**
+- Next.js 15 with App Router (Turbopack for dev)
+- React 19 with TypeScript (strict mode)
 
-### Authentication
-- **Better Auth** - Configured and ready to use
-- **Google OAuth** - Integration set up
-- Session management included
+**Authentication:**
+- Better Auth with Google OAuth
+- Server config: `@/lib/auth`
 - Client utilities: `@/lib/auth-client`
-- Server utilities: `@/lib/auth`
 
-### Database
-- **PostgreSQL** - Connection configured
-- **Drizzle ORM** - Schema and migrations ready
-- **postgres.js** - Database driver
+**Database:**
+- PostgreSQL with Drizzle ORM
+- Driver: postgres.js
 - Connection: `@/lib/db`
 - Schema: `@/lib/schema`
 
-### AI Integration
-- **Vercel AI SDK** - Installed and configured
-- **OpenAI** - Integration ready
-- Model configuration via `OPENAI_MODEL` env var
-- Streaming chat endpoint at `/api/chat`
+**AI Integration:**
+- Vercel AI SDK with OpenAI
+- Model via `OPENAI_MODEL` env var
+- Chat endpoint: `/api/chat`
 
-### UI & Styling
-- **shadcn/ui** - Component library (new-york style)
-- **Tailwind CSS** - Styling system
-- **Lucide React** - Icons
-- **Geist Font** - Typography
+**UI:**
+- shadcn/ui (new-york style, neutral colors)
+- Tailwind CSS with CSS variables
+- Lucide React icons
 
 ## Project Structure
 
@@ -47,94 +40,28 @@ You are working with a Next.js agentic coding starter kit that comes pre-configu
 src/
 ├── app/                    # Next.js App Router
 │   ├── api/
-│   │   ├── auth/[...all]/ # Better Auth catch-all route
-│   │   └── chat/          # AI chat endpoint (streaming)
-│   ├── chat/              # AI chat page (protected)
-│   ├── dashboard/         # User dashboard (protected)
-│   ├── profile/           # User profile (protected)
-│   ├── layout.tsx         # Root layout with header/footer
+│   │   ├── auth/[...all]/ # Better Auth catch-all
+│   │   └── chat/          # AI streaming endpoint
+│   ├── dashboard/         # Protected page
+│   ├── chat/              # Protected AI chat
 │   └── page.tsx           # Landing page
 ├── components/
-│   ├── auth/              # Auth components (sign-in/out)
+│   ├── auth/              # Auth components
 │   └── ui/                # shadcn/ui components
 ├── hooks/                 # Custom React hooks
 └── lib/
-    ├── auth.ts            # Better Auth server config
-    ├── auth-client.ts     # Better Auth client utilities
+    ├── auth.ts            # Better Auth server
+    ├── auth-client.ts     # Better Auth client
     ├── db.ts              # Database connection
-    ├── schema.ts          # Drizzle schema definitions
+    ├── schema.ts          # Drizzle schema
     └── utils.ts           # Utilities (cn, etc.)
 ```
 
-## Path Aliases
+**Path aliases:** All imports use `@/` → `src/`
 
-All imports use `@/` pointing to `src/`:
-- `@/components` → `src/components`
-- `@/lib` → `src/lib`
-- `@/hooks` → `src/hooks`
-- `@/app` → `src/app`
+## Better Auth Patterns
 
-## Existing Database Schema
-
-The database uses Better Auth's schema with these tables:
-
-### `user` table
-- `id` (primary key)
-- `name`, `email` (unique), `emailVerified`
-- `image`, `createdAt`, `updatedAt`
-
-### `session` table
-- `id` (primary key)
-- `token` (unique), `expiresAt`
-- `userId` (foreign key → user, cascade delete)
-- `ipAddress`, `userAgent`
-- `createdAt`, `updatedAt`
-
-### `account` table
-- OAuth provider accounts
-- Links to user (cascade delete)
-- Stores tokens and provider info
-
-### `verification` table
-- Email verification tokens
-- `identifier`, `value`, `expiresAt`
-
-## How to Extend the Database
-
-**Adding new tables:**
-
-1. Define schema in `src/lib/schema.ts`:
-```typescript
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { user } from "./schema"; // Import existing tables if needed
-
-export const yourTable = pgTable("your_table", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-```
-
-2. Generate migration:
-```bash
-npm run db:generate
-```
-
-3. Run migration:
-```bash
-npm run db:migrate
-```
-
-**For development (quick iteration):**
-```bash
-npm run db:push  # Push schema changes directly without migration files
-```
-
-## Authentication Patterns
-
-### Protecting Routes (Server Components)
-
+### Server Component (Protected Route)
 ```typescript
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -149,12 +76,11 @@ export default async function ProtectedPage() {
     redirect("/");
   }
 
-  return <div>Protected content for {session.user.name}</div>;
+  return <div>Welcome {session.user.name}</div>;
 }
 ```
 
-### Client-Side Auth
-
+### Client Component
 ```typescript
 "use client";
 import { useSession, signIn, signOut } from "@/lib/auth-client";
@@ -165,42 +91,119 @@ export function MyComponent() {
   if (isPending) return <div>Loading...</div>;
   if (!session) return <button onClick={() => signIn.social({ provider: "google" })}>Sign In</button>;
 
-  return (
-    <div>
-      <p>Welcome {session.user.name}</p>
-      <button onClick={() => signOut()}>Sign Out</button>
-    </div>
-  );
+  return <button onClick={() => signOut()}>Sign Out</button>;
 }
 ```
 
-## AI Integration Patterns
+### API Route
+```typescript
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
 
-### Using OpenAI (CRITICAL: Always use env var)
+export async function GET() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // ... authenticated logic
+}
+```
+
+## Drizzle ORM Patterns
+
+### Database Schema (Existing Tables)
+
+**user:** id, name, email (unique), emailVerified, image, createdAt, updatedAt
+
+**session:** id, token, expiresAt, userId (FK → user, cascade delete), ipAddress, userAgent, createdAt, updatedAt
+
+**account:** OAuth provider accounts, links to user (cascade delete)
+
+**verification:** Email verification tokens
+
+### Extending Schema
+```typescript
+// In src/lib/schema.ts
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { user } from "./schema"; // Import existing tables
+
+export const yourTable = pgTable("your_table", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => user.id, { onDelete: "cascade" })
+    .notNull(),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+```
+
+**Then run:**
+- Dev: `npm run db:push` (fast iteration, no migration files)
+- Prod: `npm run db:generate` → `npm run db:migrate`
+
+### Querying User-Specific Data
+```typescript
+import { db } from "@/lib/db";
+import { yourTable } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
+
+// Get user's records
+const records = await db
+  .select()
+  .from(yourTable)
+  .where(eq(yourTable.userId, session.user.id));
+
+// Insert with user ownership
+const [newRecord] = await db
+  .insert(yourTable)
+  .values({
+    userId: session.user.id,
+    title: "Example",
+  })
+  .returning();
+
+// Update with ownership check
+const [updated] = await db
+  .update(yourTable)
+  .set({ title: "Updated" })
+  .where(and(
+    eq(yourTable.id, recordId),
+    eq(yourTable.userId, session.user.id)
+  ))
+  .returning();
+```
+
+## Vercel AI SDK Patterns
+
+### CRITICAL: Always Use Environment Variable
 ```typescript
 import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
 
 const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
+// ✓ Correct
 const result = streamText({
-  model: openai(model),  // ✓ Use env var
+  model: openai(model),
   messages: [...],
 });
 
-// ✗ NEVER hardcode: model: openai("gpt-4o-mini")
+// ✗ NEVER hardcode model names
+// model: openai("gpt-4o-mini")
 ```
 
-### Chat API Route Pattern
-
-See `src/app/api/chat/route.ts` for the complete streaming implementation:
+### Streaming Chat Endpoint
+See `src/app/api/chat/route.ts` for complete pattern:
 - Uses `convertToModelMessages()` to transform UIMessage format
 - Returns `toUIMessageStreamResponse()` for client streaming
-- Proper error handling
 
-### Client-Side Chat Hook
-
+### Client Hook
 ```typescript
 "use client";
 import { useChat } from "@ai-sdk/react";
@@ -219,27 +222,38 @@ export function ChatComponent() {
 }
 ```
 
-## UI Component Patterns
+## shadcn/ui Patterns
 
-### Always Prefer shadcn/ui
+### Check Existing Components
+Look in `src/components/ui/` before installing new ones.
 
-1. **Check existing components first** in `src/components/ui/`
-2. **Install new shadcn components** if needed:
-   ```bash
-   pnpm dlx shadcn@latest add [component-name]
-   ```
-3. **Only use custom components** if shadcn doesn't provide a suitable option
-
-### Current shadcn/ui Components Installed
-- Button, Dialog, Avatar, Dropdown Menu
-- Card, Badge, Separator
-- And more (check `src/components/ui/`)
+### Install New Components
+```bash
+pnpm dlx shadcn@latest add button
+pnpm dlx shadcn@latest add card
+pnpm dlx shadcn@latest add form
+pnpm dlx shadcn@latest add dialog
+```
 
 ### Styling Guidelines
-- Use Tailwind classes
-- Use CSS variables for theming (defined in `globals.css`)
+- Use Tailwind utility classes only
+- Use CSS variables for theming (in `globals.css`)
 - Stick to neutral color palette
-- **Avoid custom colors** unless specifically instructed
+- Avoid custom colors unless explicitly required
+
+**Common patterns:**
+```typescript
+// Semantic colors
+text-foreground          // Primary text
+text-muted-foreground    // Secondary text
+bg-background           // Main background
+bg-card                 // Card backgrounds
+border-border           // Standard borders
+
+// Responsive
+className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+className="flex flex-col md:flex-row"
+```
 
 ## Available Scripts
 
@@ -249,7 +263,7 @@ npm run build        # Production build (includes db:migrate)
 npm run start        # Start production server
 npm run lint         # ESLint
 npm run typecheck    # TypeScript validation
-npm run db:generate  # Generate migrations from schema changes
+npm run db:generate  # Generate migrations from schema
 npm run db:migrate   # Run migrations
 npm run db:push      # Push schema (dev - no migration files)
 npm run db:studio    # Open Drizzle Studio GUI
@@ -258,44 +272,18 @@ npm run db:reset     # Reset database (drop all + push schema)
 
 ## Key Principles
 
-1. **Always run lint and typecheck** after completing changes
-2. **Use existing patterns** - don't reinvent authentication, DB connections, or AI integration
-3. **Leverage what's configured** - auth, db, and AI are ready to use
-4. **Follow the App Router patterns** - server components by default, "use client" when needed
-5. **Use path aliases** - always import with `@/` prefix
-6. **Environment variables** - use `OPENAI_MODEL` for model configuration
-7. **Database changes** - update schema.ts, then run db:generate and db:migrate (or db:push for dev)
+1. **Server Components by default** - Only use "use client" when you need hooks, event handlers, or browser APIs
+2. **Always use path aliases** - Import with `@/` prefix (e.g., `@/lib/db`)
+3. **User-specific data** - Always filter DB queries by `session.user.id`
+4. **Environment variables** - Use `OPENAI_MODEL` for AI, never hardcode
+5. **Quality checks** - Always run `npm run lint` and `npm run typecheck` after changes
+6. **Database changes** - Use `db:push` for dev, `db:generate` + `db:migrate` for prod
+7. **Cascade deletes** - User data should use `onDelete: "cascade"` in foreign keys
 
-## When Building New Features
+## When Building Features
 
-1. **Understand what's already available** - check existing auth, db schema, AI setup
-2. **Extend, don't rebuild** - add to existing patterns rather than creating new systems
-3. **Follow project structure** - pages in app/, components in components/, utilities in lib/
-4. **Use TypeScript strictly** - leverage types from Drizzle schema and Better Auth
-5. **Think about integration** - how does this feature connect to auth? Need database tables? Use AI?
-6. **Keep it simple** - this is a starter kit, focus on working code over complex architectures
-
-## Common Patterns
-
-### Adding a New Protected Page
-
-1. Create route in `src/app/your-page/page.tsx`
-2. Add session check at top
-3. Use existing components from shadcn/ui
-4. Query database using Drizzle if needed
-
-### Adding Database-Backed Feature
-
-1. Define schema in `src/lib/schema.ts`
-2. Run `npm run db:push` for quick iteration
-3. Create API routes in `src/app/api/your-feature/`
-4. Build UI with shadcn/ui components
-
-### Adding AI-Powered Feature
-
-1. Create API route using Vercel AI SDK patterns
-2. Use `OPENAI_MODEL` env var for model selection
-3. Implement streaming if real-time responses needed
-4. Use `useChat` or custom hooks on client side
-
-Remember: Everything is already wired up and working. Your job is to extend the existing foundation with new features that integrate seamlessly.
+1. **Leverage what's configured** - Auth, DB, and AI are ready to extend
+2. **Follow existing patterns** - Don't reinvent authentication, DB connections, or AI integration
+3. **Use App Router conventions** - Server components, API routes, proper headers handling
+4. **Think about integration** - How does this connect to auth? Need database tables? Use AI?
+5. **Keep it simple** - Focus on working code over complex architectures
