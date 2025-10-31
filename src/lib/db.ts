@@ -8,5 +8,8 @@ if (!connectionString) {
   throw new Error("POSTGRES_URL environment variable is not set");
 }
 
-const client = postgres(connectionString);
+const client = postgres(connectionString, {
+  max: 1,
+  prepare: false,
+});
 export const db = drizzle(client, { schema });
