@@ -1,0 +1,607 @@
+# Agentic Coding Starter Pack - Cursor Rules
+
+You are an expert full-stack developer working with this Next.js 15 starter kit. Follow these rules precisely.
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router), React 19, TypeScript (strict mode)
+- **Authentication**: Better Auth with Google OAuth
+- **Database**: PostgreSQL + Drizzle ORM (postgres.js driver)
+- **AI**: Vercel AI SDK with OpenAI
+- **UI**: shadcn/ui (new-york style, neutral colors) + Tailwind CSS v4
+- **Icons**: Lucide React
+- **Path Aliases**: `@/` → `src/`
+
+## Core Principles (CRITICAL - Read First)
+
+1. **Server Components by Default** - Only use "use client" when you need useState, useEffect, onClick, or browser APIs
+2. **Always Filter by User ID** - All database queries for user-specific data MUST filter by `session.user.id`
+3. **Use Existing Patterns** - Don't reinvent auth, database connections, or AI integration
+4. **Environment Variables** - ALWAYS use `process.env.OPENAI_MODEL` for AI model, never hardcode
+5. **Quality Checks Required** - Run `npm run lint` and `npm run typecheck` after all changes
+6. **Security First** - Check authentication, validate input, verify ownership on updates/deletes
+
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── api/
+│   │   ├── auth/[...all]/  # Better Auth catch-all route
+│   │   ├── chat/           # AI streaming endpoint
+│   │   └── diagnostics/    # System diagnostics
+│   ├── dashboard/          # Protected user dashboard
+│   ├── chat/               # Protected AI chat page
+│   ├── profile/            # User profile page
+│   └── page.tsx            # Public landing page
+├── components/
+│   ├── auth/               # Authentication components
+│   └── ui/                 # shadcn/ui components
+├── lib/
+│   ├── auth.ts             # Better Auth server configuration
+│   ├── auth-client.ts      # Better Auth client utilities
+│   ├── db.ts               # Database connection (postgres.js)
+│   ├── schema.ts           # Drizzle ORM schema
+│   └── utils.ts            # Utilities (cn helper, etc.)
+└── hooks/                  # Custom React hooks
+```
+
+## Database Schema (Existing Tables)
+
+**user**: id (uuid PK), name, email (unique), emailVerified, image, createdAt, updatedAt
+**session**: id (uuid PK), token (unique), expiresAt, userId (FK → user, cascade), ipAddress, userAgent, createdAt, updatedAt
+**account**: id (uuid PK), accountId, providerId, userId (FK → user, cascade), accessToken, refreshToken, etc.
+**verification**: id (uuid PK), identifier, value, expiresAt, createdAt, updatedAt
+
+All new user-specific tables MUST include `userId` with cascade delete.
+
+## Authentication Patterns
+
+### Protected Server Component (Pages)
+```typescript
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+export default async function ProtectedPage() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    redirect("/");
+  }
+
+  return <div>Welcome {session.user.name}</div>;
+}
+```
+
+### Protected API Route
+```typescript
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Your authenticated logic here
+  return NextResponse.json({ data: "success" });
+}
+```
+
+### Client Component with Auth
+```typescript
+"use client";
+import { useSession, signIn, signOut } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
+
+export function MyComponent() {
+  const { data: session, isPending } = useSession();
+
+  if (isPending) return <div>Loading...</div>;
+
+  if (!session) {
+    return (
+      <Button onClick={() => signIn.social({ provider: "google" })}>
+        Sign In with Google
+      </Button>
+    );
+  }
+
+  return (
+    <div>
+      <p>Welcome {session.user.name}</p>
+      <Button onClick={() => signOut()}>Sign Out</Button>
+    </div>
+  );
+}
+```
+
+## Database Patterns (Drizzle ORM)
+
+### Extending Schema
+```typescript
+// In src/lib/schema.ts
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { user } from "./schema"; // Import existing tables
+
+export const yourTable = pgTable("your_table", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => user.id, { onDelete: "cascade" })
+    .notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+```
+
+**After schema changes, run:**
+- Development: `npm run db:push` (fast, no migration files)
+- Production: `npm run db:generate` then `npm run db:migrate`
+
+### User-Specific Database Queries (CRITICAL)
+```typescript
+import { db } from "@/lib/db";
+import { yourTable } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
+
+// Get user's records only
+const records = await db
+  .select()
+  .from(yourTable)
+  .where(eq(yourTable.userId, session.user.id));
+
+// Insert with user ownership
+const [newRecord] = await db
+  .insert(yourTable)
+  .values({
+    userId: session.user.id,
+    title: "Example Title",
+  })
+  .returning();
+
+// Update with ownership verification (CRITICAL for security)
+const [updated] = await db
+  .update(yourTable)
+  .set({ title: "Updated Title" })
+  .where(
+    and(
+      eq(yourTable.id, recordId),
+      eq(yourTable.userId, session.user.id) // MUST verify ownership
+    )
+  )
+  .returning();
+
+// Delete with ownership verification
+await db
+  .delete(yourTable)
+  .where(
+    and(
+      eq(yourTable.id, recordId),
+      eq(yourTable.userId, session.user.id)
+    )
+  );
+```
+
+## Vercel AI SDK Patterns
+
+### CRITICAL: Always Use Environment Variable for Model
+```typescript
+import { openai } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+// ✓ CORRECT - Use environment variable
+const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const result = streamText({
+  model: openai(model),
+  messages: [...],
+});
+
+// ✗ NEVER hardcode model names
+// model: openai("gpt-4o-mini") // DON'T DO THIS
+```
+
+### Streaming Chat Endpoint (see src/app/api/chat/route.ts)
+```typescript
+import { openai } from "@ai-sdk/openai";
+import { streamText, UIMessage, convertToModelMessages } from "ai";
+
+export async function POST(req: Request) {
+  const { messages }: { messages: UIMessage[] } = await req.json();
+
+  const result = streamText({
+    model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+    messages: convertToModelMessages(messages),
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+### Client-Side Chat Hook
+```typescript
+"use client";
+import { useChat } from "@ai-sdk/react";
+
+export function ChatComponent() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: "/api/chat",
+  });
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {messages.map((m) => (
+        <div key={m.id}>
+          {m.role}: {m.content}
+        </div>
+      ))}
+      <input value={input} onChange={handleInputChange} />
+      <button type="submit">Send</button>
+    </form>
+  );
+}
+```
+
+## UI & Component Patterns
+
+### Use shadcn/ui First (ALWAYS)
+Check `src/components/ui/` for existing components before creating new ones.
+
+**Install new components:**
+```bash
+pnpm dlx shadcn@latest add button
+pnpm dlx shadcn@latest add card
+pnpm dlx shadcn@latest add form
+pnpm dlx shadcn@latest add dialog
+pnpm dlx shadcn@latest add input
+```
+
+### Styling Guidelines (CRITICAL)
+- **Use Tailwind utility classes ONLY** - No custom CSS unless absolutely necessary
+- **Use semantic color variables** - Never use custom hex colors
+- **Mobile-first approach** - Start with mobile, add md:, lg: breakpoints
+
+**Semantic colors:**
+```typescript
+text-foreground          // Primary text
+text-muted-foreground    // Secondary text
+bg-background            // Main background
+bg-card                  // Card backgrounds
+border-border            // Standard borders
+bg-primary               // Primary button backgrounds
+bg-destructive           // Error/danger states
+```
+
+**Responsive patterns:**
+```typescript
+className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+className="flex flex-col md:flex-row"
+className="text-sm md:text-base lg:text-lg"
+className="p-4 md:p-6 lg:p-8"
+```
+
+### Server vs Client Components
+**Default to Server Components.** Only use `"use client"` when you need:
+- React hooks (useState, useEffect, useContext, etc.)
+- Event handlers (onClick, onChange, onSubmit, etc.)
+- Browser APIs (window, localStorage, etc.)
+- Third-party libraries that require client-side
+
+### Composable Component Pattern
+```typescript
+import { cn } from "@/lib/utils";
+
+export function Card({
+  className,
+  children,
+  ...props
+}: {
+  className?: string;
+  children: React.ReactNode;
+  [key: string]: any;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border bg-card p-6 shadow-sm",
+        className // Allow custom classes
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+```
+
+## Form Patterns (shadcn/ui + react-hook-form + zod)
+
+```typescript
+"use client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+const formSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+});
+
+export function ExampleForm({ onSubmit }: {
+  onSubmit: (data: z.infer<typeof formSchema>) => void
+}) {
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { title: "", description: "" },
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter title" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? "Submitting..." : "Submit"}
+        </Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+## Available npm Scripts
+
+```bash
+npm run dev          # Start development server with Turbopack
+npm run build        # Production build (includes db:migrate)
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run typecheck    # Run TypeScript type checking
+npm run db:generate  # Generate Drizzle migrations
+npm run db:migrate   # Run database migrations
+npm run db:push      # Push schema changes (dev - no migration files)
+npm run db:studio    # Open Drizzle Studio (database GUI)
+npm run db:reset     # Reset database (drop all tables + push schema)
+```
+
+## Security Checklist (CRITICAL - Never Skip)
+
+✓ **Authentication**: Check session in ALL protected routes and API endpoints
+✓ **User Data Filtering**: Filter ALL queries by `session.user.id` for user-specific data
+✓ **Ownership Verification**: Use `and(eq(table.id, id), eq(table.userId, session.user.id))` on updates/deletes
+✓ **Input Validation**: Validate and sanitize all user input
+✓ **Error Handling**: Use try/catch in API routes, log errors server-side, return user-friendly messages
+✓ **Environment Variables**: Never commit secrets, use .env for sensitive data
+
+## Common API Route Pattern
+
+```typescript
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { yourTable } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
+import { headers } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+
+// GET - List user's items
+export async function GET(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const items = await db
+      .select()
+      .from(yourTable)
+      .where(eq(yourTable.userId, session.user.id));
+
+    return NextResponse.json({ items });
+  } catch (error) {
+    console.error("Error fetching items:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch items" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Create new item
+export async function POST(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { title, description } = body;
+
+    // Validate input
+    if (!title || title.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Title is required" },
+        { status: 400 }
+      );
+    }
+
+    const [newItem] = await db
+      .insert(yourTable)
+      .values({
+        userId: session.user.id,
+        title: title.trim(),
+        description: description?.trim() || null,
+      })
+      .returning();
+
+    return NextResponse.json({ item: newItem }, { status: 201 });
+  } catch (error) {
+    console.error("Error creating item:", error);
+    return NextResponse.json(
+      { error: "Failed to create item" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update item (with ownership check)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+
+    const [updated] = await db
+      .update(yourTable)
+      .set({
+        ...body,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(yourTable.id, params.id),
+          eq(yourTable.userId, session.user.id) // CRITICAL: ownership check
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Item not found or unauthorized" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ item: updated });
+  } catch (error) {
+    console.error("Error updating item:", error);
+    return NextResponse.json(
+      { error: "Failed to update item" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Feature Implementation Workflow
+
+When building a new feature, follow this sequence:
+
+1. **Plan Architecture**
+   - What database tables are needed?
+   - What API endpoints are required?
+   - What UI pages/components?
+   - Does it need authentication?
+   - Does it integrate with AI?
+
+2. **Database Schema**
+   - Add tables to `src/lib/schema.ts`
+   - Include userId with cascade delete for user-specific data
+   - Run `npm run db:push` (dev) or `npm run db:generate` + `npm run db:migrate` (prod)
+
+3. **API Routes**
+   - Create in `src/app/api/[route]/route.ts`
+   - Always check authentication
+   - Always filter by userId for user data
+   - Validate input, handle errors
+
+4. **UI Components**
+   - Use shadcn/ui components first
+   - Server components by default
+   - Client components only when needed
+   - Mobile-first responsive design
+
+5. **Quality Checks**
+   - Run `npm run lint`
+   - Run `npm run typecheck`
+   - Test authentication flows
+   - Test error cases
+
+## Anti-Patterns (NEVER Do These)
+
+❌ **Don't use "use client" on server components** - Breaks SSR, increases bundle size
+❌ **Don't hardcode OpenAI model names** - Use `process.env.OPENAI_MODEL`
+❌ **Don't query database without filtering by userId** - Major security vulnerability
+❌ **Don't skip authentication checks** - Always verify session
+❌ **Don't create custom components when shadcn/ui has them** - Wastes time, breaks consistency
+❌ **Don't use custom colors outside design system** - Breaks theming, accessibility
+❌ **Don't skip ownership verification on updates/deletes** - Security vulnerability
+❌ **Don't forget to run lint and typecheck** - Catches bugs early
+❌ **Don't commit .env files** - Exposes secrets
+
+## Quick Reference
+
+**Import Aliases:**
+- `@/lib/auth` - Better Auth server
+- `@/lib/auth-client` - Better Auth client
+- `@/lib/db` - Database connection
+- `@/lib/schema` - Drizzle schema
+- `@/lib/utils` - Utilities (cn helper)
+- `@/components/ui/*` - shadcn/ui components
+
+**Common Imports:**
+```typescript
+// Auth
+import { auth } from "@/lib/auth";
+import { useSession, signIn, signOut } from "@/lib/auth-client";
+
+// Database
+import { db } from "@/lib/db";
+import { eq, and, or } from "drizzle-orm";
+
+// AI SDK
+import { openai } from "@ai-sdk/openai";
+import { streamText, generateText } from "ai";
+import { useChat } from "@ai-sdk/react";
+
+// UI
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+```
+
+## Remember
+
+- **Extend, don't rebuild** - Use what's already configured
+- **Simple over clever** - Straightforward code wins
+- **Security always** - Check auth, validate input, verify ownership
+- **Quality matters** - Lint, typecheck, test before considering done
+- **Follow patterns** - Look at existing code for examples
+
+This starter kit is designed for rapid, secure full-stack development. Follow these patterns and you'll build features quickly without security vulnerabilities or technical debt.
