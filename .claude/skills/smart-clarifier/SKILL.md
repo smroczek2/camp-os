@@ -1,18 +1,18 @@
 ---
 name: smart-clarifier
-description: Asks 2-3 critical clarifying questions before building new features. Activates when user requests new functionality or describes something to build. Focuses on high-impact decisions like scope, data model, authentication requirements, and AI integrations. Uses AskUserQuestion tool for interactive selection. Makes smart assumptions for low-impact decisions.
+description: Asks 1-7 clarifying questions before building new features. Activates when user requests new functionality or describes something to build. Focuses on high-impact decisions like scope, data model, authentication requirements, and AI integrations. Uses AskUserQuestion tool for interactive selection. Makes smart assumptions for low-impact decisions.
 ---
 
 # Smart Clarifier
 
-Asks 2-3 critical clarifying questions before implementation to ensure correct understanding of requirements.
+Asks 1-7 clarifying questions before implementation to ensure correct understanding of requirements.
 
 ## ⚠️ CRITICAL: Use AskUserQuestion Tool
 
 **YOU MUST USE THE AskUserQuestion TOOL - NOT MARKDOWN TEXT**
 
 When this skill activates:
-1. Identify 2-3 critical questions
+1. Identify 1-7 critical questions
 2. **IMMEDIATELY call AskUserQuestion tool** with those questions
 3. Do NOT write questions as markdown
 4. The tool call IS your question - no explanation needed first
@@ -25,11 +25,11 @@ When this skill activates:
 - About to implement something non-trivial
 - Requirements could be interpreted multiple ways
 
-**Even if the request seems clear**, ask 2-3 clarifying questions. Better to ask upfront than build the wrong thing.
+**Even if the request seems clear**, ask 1-7 clarifying questions. Better to ask upfront than build the wrong thing.
 
 ## Question Framework
 
-Ask **EXACTLY 2-3 questions** about high-impact decisions. No more, no less.
+Ask **1-7 questions** about high-impact decisions based on the complexity of the feature request.
 
 ### High-Impact Areas (Always Consider)
 
@@ -117,7 +117,7 @@ Mark your recommended option with "(Recommended)" in the description.
 - AI integration needs
 - Major feature scope decisions
 
-**Choose 2-3 questions from CRITICAL and HIGH categories only.**
+**Choose 1-7 questions from CRITICAL and HIGH categories based on feature complexity.**
 
 ## Making Smart Assumptions
 
@@ -253,8 +253,8 @@ Be opinionated but flexible. User can override your recommendation.
 - "Should we use Better Auth?" (it's set up)
 - "Should protected routes require login?" (obviously yes)
 
-❌ **Don't ask more than 3 questions:**
-- Overwhelming for user
+❌ **Don't ask more than 7 questions:**
+- Can be overwhelming for user
 - Most things can be assumed or iterated on
 
 ❌ **Don't ask without providing recommendations:**
@@ -264,7 +264,7 @@ Be opinionated but flexible. User can override your recommendation.
 ## Remember
 
 - **ALWAYS use AskUserQuestion tool** - Never plain text questions
-- **Always ask 2-3 questions** - Focus on CRITICAL and HIGH impact areas
+- **Always ask 1-7 questions** - Focus on CRITICAL and HIGH impact areas based on feature complexity
 - **Always provide recommendations** - Mark with "(Recommended)" in descriptions
 - **Make smart assumptions** - Document briefly what you're assuming
 - **Be opinionated but flexible** - Guide users, accept their choices
