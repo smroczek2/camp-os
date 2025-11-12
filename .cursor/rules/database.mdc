@@ -1,0 +1,79 @@
+---
+alwaysApply: false
+globs:
+  - "src/lib/schema.ts"
+  - "src/app/api/**/*.ts"
+  - "**/*db*.ts"
+description: Database patterns and security requirements
+---
+
+# Database Rules
+
+**See AGENTS.md for complete database patterns and examples.**
+
+## Critical Security Requirement
+
+**ALWAYS filter by User ID** - All database queries for user-specific data MUST filter by `session.user.id`
+
+## Schema Pattern
+
+All new user-specific tables MUST include:
+
+```typescript
+userId: uuid("user_id")
+  .references(() => user.id, { onDelete: "cascade" })
+  .notNull()
+```
+
+## Query Patterns (CRITICAL)
+
+```typescript
+import { db } from "@/lib/db";
+import { yourTable } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
+
+// ✓ CORRECT - Get user's records only
+const records = await db
+  .select()
+  .from(yourTable)
+  .where(eq(yourTable.userId, session.user.id));
+
+// ✓ CORRECT - Insert with user ownership
+const [newRecord] = await db
+  .insert(yourTable)
+  .values({ userId: session.user.id, title: "Example" })
+  .returning();
+
+// ✓ CORRECT - Update with ownership verification (CRITICAL)
+const [updated] = await db
+  .update(yourTable)
+  .set({ title: "Updated" })
+  .where(and(
+    eq(yourTable.id, recordId),
+    eq(yourTable.userId, session.user.id)  // MUST verify ownership
+  ))
+  .returning();
+
+// ✓ CORRECT - Delete with ownership verification
+await db
+  .delete(yourTable)
+  .where(and(
+    eq(yourTable.id, recordId),
+    eq(yourTable.userId, session.user.id)
+  ));
+
+// ✗ WRONG - Returns all users' data (security vulnerability!)
+const tasks = await db.select().from(tasks);
+```
+
+## After Schema Changes
+
+**Development**: `npm run db:push` (fast, no migration files)
+**Production**: `npm run db:generate` then `npm run db:migrate`
+
+## Security Checklist
+
+✓ Filter ALL user data queries by `session.user.id`
+✓ Use `and(eq(table.id, id), eq(table.userId, session.user.id))` on updates/deletes
+✓ Verify ownership before any modification
+✓ Never expose other users' data

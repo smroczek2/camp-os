@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+description: Core project principles and patterns
+---
+
+# Core Project Rules
+
+**For comprehensive architecture and patterns, see AGENTS.md in the project root.**
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router), React 19, TypeScript (strict mode)
+- **Authentication**: Better Auth with Google OAuth
+- **Database**: PostgreSQL + Drizzle ORM (postgres.js driver)
+- **AI**: Vercel AI SDK with OpenAI
+- **UI**: shadcn/ui (new-york style, neutral colors) + Tailwind CSS v4
+- **Icons**: Lucide React
+- **Path Aliases**: `@/` → `src/`
+
+## Core Principles (CRITICAL)
+
+1. **Server Components by Default** - Only use "use client" when you need useState, useEffect, onClick, or browser APIs
+2. **Use Existing Patterns** - Don't reinvent auth, database connections, or AI integration
+3. **Quality Checks Required** - Run `npm run lint` and `npm run typecheck` after all changes
+4. **Security First** - Check authentication, validate input, verify ownership on updates/deletes
+
+## Commands
+
+```bash
+npm run dev          # Development
+npm run build        # Build for production
+npm run lint         # ESLint (ALWAYS run after changes)
+npm run typecheck    # TypeScript validation (ALWAYS run after changes)
+npm run db:push      # Push schema changes (dev)
+npm run db:generate  # Generate migrations (prod)
+npm run db:migrate   # Run migrations (prod)
+```
+
+## Anti-Patterns (NEVER Do)
+
+❌ Use "use client" on server components unnecessarily
+❌ Hardcode model names or API keys
+❌ Skip authentication checks
+❌ Create custom components when shadcn/ui has them
+❌ Use custom hex colors outside design system
+❌ Forget to run lint and typecheck
+❌ Commit .env files

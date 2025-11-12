@@ -1,6 +1,19 @@
 ---
 alwaysApply: true
+description: Project-specific rules and workflow
 ---
 
-- Always run the LINT and TYPESCHECK scripts after completing your changes. This is to check for any issues.
+# Project Rules
+
+**For comprehensive architecture and patterns, see AGENTS.md in the project root.**
+
+**Additional scoped rules are available in:**
+- `core.mdc` - Core principles and tech stack
+- `database.mdc` - Database patterns and security
+- `ai.mdc` - AI integration patterns
+- `security.mdc` - Authentication and security
+
+## Workflow Rules
+
+- Always run the LINT and TYPECHECK scripts after completing your changes. This is to check for any issues.
 - NEVER start the dev server yourself. If you need something from the terminal, ask the user to provide it to you.

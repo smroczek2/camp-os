@@ -1,0 +1,95 @@
+---
+alwaysApply: false
+globs:
+  - "src/app/api/chat/**/*.ts"
+  - "**/*ai*.ts"
+  - "**/*chat*.tsx"
+  - "**/*llm*.ts"
+description: AI integration patterns using Vercel AI SDK
+---
+
+# AI Integration Rules
+
+**See AGENTS.md for complete AI integration patterns and examples.**
+
+## CRITICAL: Environment Variable for Model
+
+**ALWAYS use `process.env.OPENAI_MODEL` for AI model, never hardcode**
+
+```typescript
+import { openai } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+// ✓ CORRECT - Use environment variable
+const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const result = streamText({
+  model: openai(model),
+  messages: [...],
+});
+
+// ✗ WRONG - Never hardcode model names
+// model: openai("gpt-4o-mini") // DON'T DO THIS
+```
+
+## Streaming Chat Pattern
+
+```typescript
+import { openai } from "@ai-sdk/openai";
+import { streamText, UIMessage, convertToModelMessages } from "ai";
+
+export async function POST(req: Request) {
+  const { messages }: { messages: UIMessage[] } = await req.json();
+
+  const result = streamText({
+    model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+    messages: convertToModelMessages(messages),
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+## Client Hook Pattern
+
+```typescript
+"use client";
+import { useChat } from "@ai-sdk/react";
+
+export function ChatComponent() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: "/api/chat",
+  });
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {messages.map((m) => (
+        <div key={m.id}>
+          {m.role}: {m.content}
+        </div>
+      ))}
+      <input value={input} onChange={handleInputChange} />
+      <button type="submit">Send</button>
+    </form>
+  );
+}
+```
+
+## Structured Output Pattern
+
+```typescript
+import { generateObject } from "ai";
+import { z } from "zod";
+
+const { object } = await generateObject({
+  model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+  schema: z.object({
+    title: z.string(),
+    tags: z.array(z.string()),
+  }),
+  prompt: "Generate content",
+});
+```
+
+## Environment Variable
+
+Required: `OPENAI_MODEL` - Model name (default: gpt-4o-mini)

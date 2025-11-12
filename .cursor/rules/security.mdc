@@ -1,0 +1,99 @@
+---
+alwaysApply: true
+description: Security requirements and authentication patterns
+---
+
+# Security Rules
+
+**See AGENTS.md for complete security patterns and authentication examples.**
+
+## Authentication Patterns
+
+### Protected Server Component
+
+```typescript
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+export default async function ProtectedPage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/");
+
+  return <div>Welcome {session.user.name}</div>;
+}
+```
+
+### Protected API Route
+
+```typescript
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Your authenticated logic here
+}
+```
+
+### Client Component with Auth
+
+```typescript
+"use client";
+import { useSession, signIn, signOut } from "@/lib/auth-client";
+
+export function MyComponent() {
+  const { data: session, isPending } = useSession();
+
+  if (isPending) return <div>Loading...</div>;
+
+  if (!session) {
+    return <Button onClick={() => signIn.social({ provider: "google" })}>Sign In</Button>;
+  }
+
+  return <div>Welcome {session.user.name}</div>;
+}
+```
+
+## Security Checklist (CRITICAL)
+
+### Authentication
+✓ Check session in ALL protected routes (pages and API)
+✓ Return 401 for unauthenticated requests
+✓ Use `redirect("/")` for server pages, `NextResponse.json` for API
+
+### Data Access
+✓ Filter ALL queries by `session.user.id` for user-specific data
+✓ Use `and(eq(table.id, id), eq(table.userId, session.user.id))` on updates/deletes
+✓ Return 404 if record not found OR user doesn't own it (don't leak info)
+
+### Input Validation
+✓ Validate all user input before database operations
+✓ Use Zod schemas for type-safe validation
+✓ Trim strings, sanitize data
+✓ Return 400 with clear error messages for invalid input
+
+### Error Handling
+✓ Use try/catch blocks in all API routes
+✓ Log errors server-side with `console.error()`
+✓ Return user-friendly messages (don't expose internals)
+✓ Return appropriate status codes (400, 401, 404, 500)
+
+### Environment
+✓ Never commit .env files to git
+✓ Use environment variables for all sensitive data
+✓ Never hardcode API keys or secrets
+
+## Common Security Vulnerabilities to Avoid
+
+❌ **Missing authentication** - Always check session
+❌ **Missing user filtering** - Always filter by userId
+❌ **Missing ownership checks** - Always verify on updates/deletes
+❌ **Exposing error details** - Return generic messages to users
+❌ **SQL injection** - Use Drizzle ORM, never raw queries
+❌ **XSS attacks** - React escapes by default, don't use dangerouslySetInnerHTML
+❌ **CSRF attacks** - Better Auth handles this
