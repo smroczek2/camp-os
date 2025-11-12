@@ -10,6 +10,26 @@ A complete agentic coding starterpack with authentication, PostgreSQL database, 
 - **🎨 UI Components**: shadcn/ui with Tailwind CSS
 - **⚡ Modern Stack**: Next.js 15, React 19, TypeScript
 - **📱 Responsive**: Mobile-first design approach
+- **🔌 MCP Servers**: Pre-configured Model Context Protocol servers for enhanced AI capabilities
+
+## 🔌 Available MCP Servers
+
+This project includes pre-configured MCP (Model Context Protocol) servers that enhance AI coding assistance:
+
+### shadcn
+Provides access to shadcn/ui component registry, examples, and documentation directly from Claude Code.
+
+### context7
+Fetches up-to-date library documentation and code examples from Context7.
+
+### puppeteer
+Enables browser automation capabilities:
+- Navigate to URLs and take screenshots
+- Click elements and fill forms
+- Execute JavaScript in real browsers
+- Capture console logs and page interactions
+
+**Configuration**: All MCP servers are defined in `.mcp.json` and work automatically when you use Claude Code with this project.
 
 ## 📋 Prerequisites
 
