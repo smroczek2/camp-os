@@ -16,9 +16,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { isReservedFieldKey } from "@/lib/form-ui";
+
+type ValidationRules = {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+};
+
+type ConditionalLogic = {
+  showIf?: Array<{
+    fieldKey: string;
+    operator: "equals" | "notEquals" | "contains" | "isEmpty" | "isNotEmpty";
+    value: unknown;
+  }>;
+};
 
 type FormConfig = {
   id: string;
@@ -27,54 +46,54 @@ type FormConfig = {
     id: string;
     fieldKey: string;
     label: string;
-    description?: string;
+    description?: string | null;
     fieldType: string;
-    validationRules?: any;
-    conditionalLogic?: {
-      showIf?: Array<{
-        fieldKey: string;
-        operator: string;
-        value: any;
-      }>;
-    };
+    validationRules?: ValidationRules | null;
+    conditionalLogic?: ConditionalLogic | null;
     displayOrder: number;
     options?: Array<{
       label: string;
       value: string;
-    }>;
+    }> | null;
   }>;
 };
 
 export function DynamicForm({
   formConfig,
-  userId,
   childId,
+  mode = "submit",
 }: {
   formConfig: FormConfig;
-  userId: string;
   childId?: string;
+  mode?: "submit" | "preview";
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [previewNotice, setPreviewNotice] = useState<string | null>(null);
 
   // Build Zod schema dynamically from form definition
+  const visibleFields = formConfig.fields.filter(
+    (field) => !isReservedFieldKey(field.fieldKey)
+  );
+
   const schema = buildSubmissionSchema(
-    formConfig.fields.map((f) => ({
+    visibleFields.map((f) => ({
       fieldKey: f.fieldKey,
       fieldType: f.fieldType as FieldType,
-      validationRules: f.validationRules,
+      validationRules: f.validationRules ?? undefined,
     }))
   );
 
-  const form = useForm({
+  const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
   });
 
   // Watch all fields for conditional logic
   const formValues = useWatch({ control: form.control });
 
-  // Save draft to localStorage
+  // Save draft to localStorage (submit mode only)
   useEffect(() => {
+    if (mode !== "submit") return;
     const subscription = form.watch((value) => {
       localStorage.setItem(
         `form-draft-${formConfig.id}`,
@@ -82,10 +101,11 @@ export function DynamicForm({
       );
     });
     return () => subscription.unsubscribe();
-  }, [form, formConfig.id]);
+  }, [form, formConfig.id, mode]);
 
   // Restore draft on mount
   useEffect(() => {
+    if (mode !== "submit") return;
     const draft = localStorage.getItem(`form-draft-${formConfig.id}`);
     if (draft) {
       try {
@@ -94,14 +114,16 @@ export function DynamicForm({
         console.error("Failed to restore draft:", e);
       }
     }
-  }, [form, formConfig.id]);
+  }, [form, formConfig.id, mode]);
 
   // Check if field should be visible based on conditional logic
   const shouldShowField = (field: FormConfig["fields"][0]) => {
     if (!field.conditionalLogic?.showIf) return true;
 
     return field.conditionalLogic.showIf.every((condition) => {
-      const fieldValue = formValues?.[condition.fieldKey];
+      const fieldValue = (formValues as Record<string, unknown> | undefined)?.[
+        condition.fieldKey
+      ];
 
       switch (condition.operator) {
         case "equals":
@@ -112,7 +134,9 @@ export function DynamicForm({
           if (Array.isArray(fieldValue)) {
             return fieldValue.includes(condition.value);
           }
-          return fieldValue?.toString().includes(condition.value);
+          return fieldValue
+            ?.toString()
+            .includes((condition.value ?? "").toString());
         case "isEmpty":
           return !fieldValue || fieldValue === "";
         case "isNotEmpty":
@@ -123,7 +147,12 @@ export function DynamicForm({
     });
   };
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: Record<string, unknown>) => {
+    if (mode === "preview") {
+      setPreviewNotice("Preview mode: submission is disabled.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await submitFormAction({
@@ -146,12 +175,17 @@ export function DynamicForm({
   };
 
   // Sort fields by displayOrder
-  const sortedFields = [...formConfig.fields].sort(
+  const sortedFields = [...visibleFields].sort(
     (a, b) => a.displayOrder - b.displayOrder
   );
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      {mode === "preview" && previewNotice && (
+        <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+          {previewNotice}
+        </div>
+      )}
       {sortedFields.map((field) => {
         // Check conditional visibility
         if (!shouldShowField(field)) return null;
@@ -210,21 +244,41 @@ export function DynamicForm({
             )}
 
             {field.fieldType === "boolean" && (
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id={field.fieldKey}
-                  checked={!!form.watch(field.fieldKey)}
-                  onCheckedChange={(checked) =>
-                    form.setValue(field.fieldKey, checked === true)
-                  }
-                />
-                <Label
-                  htmlFor={field.fieldKey}
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {field.label}
-                </Label>
-              </div>
+              <RadioGroup
+                value={
+                  form.watch(field.fieldKey) === true
+                    ? "yes"
+                    : form.watch(field.fieldKey) === false
+                      ? "no"
+                      : ""
+                }
+                onValueChange={(value) =>
+                  form.setValue(field.fieldKey, value === "yes")
+                }
+                className="grid gap-2"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem
+                    id={`${field.fieldKey}-yes`}
+                    value="yes"
+                  />
+                  <Label
+                    htmlFor={`${field.fieldKey}-yes`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Yes
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id={`${field.fieldKey}-no`} value="no" />
+                  <Label
+                    htmlFor={`${field.fieldKey}-no`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    No
+                  </Label>
+                </div>
+              </RadioGroup>
             )}
 
             {field.fieldType === "select" && field.options && (
@@ -322,7 +376,9 @@ export function DynamicForm({
           onClick={() => {
             if (confirm("Clear all form data?")) {
               form.reset();
-              localStorage.removeItem(`form-draft-${formConfig.id}`);
+              if (mode === "submit") {
+                localStorage.removeItem(`form-draft-${formConfig.id}`);
+              }
             }
           }}
           disabled={submitting}
@@ -336,7 +392,7 @@ export function DynamicForm({
               Submitting...
             </>
           ) : (
-            "Submit Form"
+            mode === "preview" ? "Try submit (preview)" : "Submit Form"
           )}
         </Button>
       </div>

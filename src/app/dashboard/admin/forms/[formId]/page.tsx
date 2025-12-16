@@ -5,6 +5,8 @@ import { formDefinitions } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { FormDetailsView } from "@/components/forms/form-builder/form-details";
 
+type FormType = "registration" | "waiver" | "medical" | "custom";
+
 export default async function FormDetailsPage({
   params,
 }: {
@@ -56,5 +58,5 @@ export default async function FormDetailsPage({
     );
   }
 
-  return <FormDetailsView form={form} />;
+  return <FormDetailsView form={{ ...form, formType: form.formType as FormType }} />;
 }

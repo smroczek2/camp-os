@@ -8,7 +8,7 @@ import {
   aiActions,
 } from "@/lib/schema";
 import { buildSubmissionSchema, type FieldType } from "@/lib/form-validation";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 // Type for AI-generated form structure
 export type AIFormGeneration = {
@@ -59,10 +59,10 @@ export class FormService {
       where: eq(formDefinitions.id, formId),
       with: {
         fields: {
-          orderBy: (fields: any, { asc }: any) => [asc(fields.displayOrder)],
+          orderBy: (fields, { asc }) => [asc(fields.displayOrder)],
           with: {
             options: {
-              orderBy: (options: any, { asc }: any) => [asc(options.displayOrder)],
+              orderBy: (options, { asc }) => [asc(options.displayOrder)],
               with: {
                 childOptions: true, // Nested options
               },
@@ -113,7 +113,7 @@ export class FormService {
       formDef.fields.map((f) => ({
         fieldKey: f.fieldKey,
         fieldType: f.fieldType as FieldType,
-        validationRules: f.validationRules,
+        validationRules: f.validationRules ?? undefined,
       }))
     );
 
@@ -274,12 +274,175 @@ export class FormService {
           streamId: `ai-action-${aiActionId}`,
           eventType: "AIActionExecuted",
           eventData: { aiActionId, formId: form.id },
-          version: 2,
+          version: 3,
           userId: approvedBy,
         },
       ]);
 
       return form;
+    });
+  }
+
+  /**
+   * Update a form definition + fields/options
+   */
+  async updateFormDefinition(
+    formId: string,
+    userId: string,
+    data: {
+      name: string;
+      description: string | null;
+      formType: "registration" | "waiver" | "medical" | "custom";
+      fields: Array<{
+        id?: string;
+        fieldKey: string;
+        label: string;
+        description?: string | null;
+        fieldType: string;
+        required: boolean;
+        displayOrder: number;
+        options?: Array<{
+          label: string;
+          value: string;
+          displayOrder: number;
+          triggersFields?: { fieldKeys?: string[] };
+          parentOptionId?: string | null;
+        }>;
+      }>;
+    }
+  ) {
+    return db.transaction(async (tx) => {
+      const existingForm = await tx.query.formDefinitions.findFirst({
+        where: eq(formDefinitions.id, formId),
+        columns: { id: true, version: true },
+      });
+
+      if (!existingForm) {
+        throw new Error("Form not found");
+      }
+
+      const nextVersion = existingForm.version + 1;
+
+      await tx
+        .update(formDefinitions)
+        .set({
+          name: data.name,
+          description: data.description,
+          formType: data.formType,
+          version: nextVersion,
+          updatedAt: new Date(),
+        })
+        .where(eq(formDefinitions.id, formId));
+
+      const existingFields = await tx.query.formFields.findMany({
+        where: eq(formFields.formDefinitionId, formId),
+        columns: { id: true, fieldKey: true, validationRules: true },
+      });
+
+      const existingFieldById = new Map(existingFields.map((f) => [f.id, f]));
+      const keepFieldIds: string[] = [];
+
+      // Upsert fields
+      for (const field of data.fields) {
+        if (field.id && existingFieldById.has(field.id)) {
+          const existingField = existingFieldById.get(field.id)!;
+
+          if (existingField.fieldKey !== field.fieldKey) {
+            throw new Error(
+              `Field key mismatch for ${field.id}; create a new field instead`
+            );
+          }
+
+          const nextValidationRules = {
+            ...(existingField.validationRules ?? {}),
+            required: field.required,
+          };
+
+          await tx
+            .update(formFields)
+            .set({
+              label: field.label,
+              description: field.description ?? null,
+              fieldType: field.fieldType,
+              displayOrder: field.displayOrder,
+              validationRules: nextValidationRules,
+              updatedAt: new Date(),
+            })
+            .where(eq(formFields.id, field.id));
+
+          keepFieldIds.push(field.id);
+
+          // Replace options
+          await tx
+            .delete(formOptions)
+            .where(eq(formOptions.formFieldId, field.id));
+
+          if (field.options && field.options.length > 0) {
+            await tx.insert(formOptions).values(
+              field.options.map((opt) => ({
+                formFieldId: field.id!,
+                parentOptionId: opt.parentOptionId ?? null,
+                label: opt.label,
+                value: opt.value,
+                displayOrder: opt.displayOrder,
+                triggersFields: opt.triggersFields,
+              }))
+            );
+          }
+        } else {
+          const [createdField] = await tx
+            .insert(formFields)
+            .values({
+              formDefinitionId: formId,
+              fieldKey: field.fieldKey,
+              label: field.label,
+              description: field.description ?? null,
+              fieldType: field.fieldType,
+              validationRules: { required: field.required },
+              displayOrder: field.displayOrder,
+              updatedAt: new Date(),
+            })
+            .returning();
+
+          keepFieldIds.push(createdField.id);
+
+          if (field.options && field.options.length > 0) {
+            await tx.insert(formOptions).values(
+              field.options.map((opt) => ({
+                formFieldId: createdField.id,
+                parentOptionId: opt.parentOptionId ?? null,
+                label: opt.label,
+                value: opt.value,
+                displayOrder: opt.displayOrder,
+                triggersFields: opt.triggersFields,
+              }))
+            );
+          }
+        }
+      }
+
+      // Delete removed fields (cascade deletes options)
+      const toDelete = existingFields
+        .map((f) => f.id)
+        .filter((id) => !keepFieldIds.includes(id));
+      if (toDelete.length > 0) {
+        await tx.delete(formFields).where(inArray(formFields.id, toDelete));
+      }
+
+      await tx.insert(events).values({
+        streamId: `form-${formId}`,
+        eventType: "FormUpdated",
+        eventData: { formId },
+        version: nextVersion,
+        userId,
+      });
+
+      const [updatedForm] = await tx
+        .select()
+        .from(formDefinitions)
+        .where(eq(formDefinitions.id, formId));
+
+      return updatedForm;
     });
   }
 

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { aiActions, events } from "@/lib/schema";
 import { enforcePermission } from "@/lib/rbac";
 import type { AIFormGeneration } from "@/services/form-service";
+import { getFieldTypeLabel, isReservedFieldKey } from "@/lib/form-ui";
 
 // AI schema for form generation
 export const aiFormGenerationSchema = z.object({
@@ -38,7 +39,7 @@ export const aiFormGenerationSchema = z.object({
             "multiselect",
             "boolean",
           ])
-          .describe("Type of input field"),
+          .describe("Type of input field (use boolean for a Yes/No question)"),
         description: z.string().optional().describe("Help text for the field"),
         validationRules: z
           .object({
@@ -110,6 +111,7 @@ Generate a structured form definition based on the user's requirements.
 Guidelines:
 - Use clear, descriptive field names
 - fieldKey must be snake_case (e.g., "child_name", "t_shirt_size")
+- NEVER create fields for internal IDs or scope (campId/camp_id, sessionId/session_id, registrationId, childId, userId). Parents should never be asked to choose these.
 - Add validation rules where appropriate
 - Use conditional logic to show/hide fields based on previous answers
 - For nested options (e.g., "Select Activity" with sub-activities), use triggersFields
@@ -121,7 +123,7 @@ Example: "Form with name, age, dietary restrictions (with allergies if Yes)"
 Should generate:
 - child_name (text, required)
 - age (number, required, min: 5, max: 18)
-- has_dietary_restrictions (boolean, required)
+- has_dietary_restrictions (boolean, required) // Yes/No question
 - dietary_restrictions (textarea, conditional: showIf has_dietary_restrictions = true)`;
 
   const result = await generateObject({
@@ -138,6 +140,38 @@ Generate a complete form definition with all necessary fields, validation, and c
   return result.object;
 }
 
+export function sanitizeGeneratedForm(generatedForm: AIFormGeneration): AIFormGeneration {
+  const filteredFields = generatedForm.fields
+    .filter((field) => !isReservedFieldKey(field.fieldKey))
+    .map((field, index) => ({
+      ...field,
+      displayOrder: index + 1,
+    }));
+
+  return {
+    ...generatedForm,
+    fields: filteredFields,
+  };
+}
+
+export function buildFormPreview(generatedForm: AIFormGeneration) {
+  return {
+    formName: generatedForm.formDefinition.name,
+    formType: generatedForm.formDefinition.formType,
+    fieldCount: generatedForm.fields.length,
+    sections: [...new Set(generatedForm.fields.map((f) => f.sectionName))].filter(
+      Boolean
+    ),
+    fields: generatedForm.fields.map((f) => ({
+      label: f.label,
+      type: getFieldTypeLabel(f.fieldType),
+      required: f.validationRules?.required ?? false,
+      conditional: !!f.conditionalLogic,
+      hasOptions: !!f.options && f.options.length > 0,
+    })),
+  };
+}
+
 /**
  * Create AI action for form generation (requires admin approval)
  */
@@ -151,24 +185,11 @@ export async function createFormGenerationAction(
   await enforcePermission(userId, "form", "create");
 
   // Generate form structure using AI
-  const generatedForm = await generateFormFromPrompt(prompt, campId, sessionId);
+  const generatedForm = sanitizeGeneratedForm(
+    await generateFormFromPrompt(prompt, campId, sessionId)
+  );
 
-  // Create preview for admin approval
-  const preview = {
-    formName: generatedForm.formDefinition.name,
-    formType: generatedForm.formDefinition.formType,
-    fieldCount: generatedForm.fields.length,
-    sections: [
-      ...new Set(generatedForm.fields.map((f) => f.sectionName)),
-    ].filter(Boolean),
-    fields: generatedForm.fields.map((f) => ({
-      label: f.label,
-      type: f.fieldType,
-      required: f.validationRules?.required ?? false,
-      conditional: !!f.conditionalLogic,
-      hasOptions: !!f.options && f.options.length > 0,
-    })),
-  };
+  const preview = buildFormPreview(generatedForm);
 
   return db.transaction(async (tx) => {
     const [aiAction] = await tx

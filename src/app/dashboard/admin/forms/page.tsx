@@ -107,7 +107,7 @@ export default async function FormsPage() {
               <div className="space-y-2 text-sm">
                 <p className="text-muted-foreground">
                   {form.fields?.length || 0} fields •{" "}
-                  {(form.camp as any)?.name || "Unknown"}
+                  {form.camp?.name ?? "Unknown"}
                 </p>
                 {form.submissions && form.submissions.length > 0 && (
                   <p className="text-muted-foreground">

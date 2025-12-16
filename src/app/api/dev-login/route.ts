@@ -14,23 +14,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { userId } = await request.json();
+    const { email } = await request.json();
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID required" }, { status: 400 });
+    if (!email) {
+      return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    // Verify user exists
+    // Look up user by email
     const userRecord = await db.query.user.findFirst({
-      where: eq(user.id, userId),
+      where: eq(user.email, email),
     });
 
     if (!userRecord) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Set dev user cookie
-    await setDevUser(userId);
+    // Set dev user cookie with actual user ID
+    await setDevUser(userRecord.id);
 
     return NextResponse.json({
       success: true,

@@ -11,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -19,22 +21,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Send, Check, X, Loader2 } from "lucide-react";
+import { Sparkles, Send, Check, X, Loader2, ArrowLeft } from "lucide-react";
 import {
   generateFormAction,
   approveAIFormAction,
 } from "@/app/actions/form-actions";
+import { FIELD_TYPE_OPTIONS, fieldTypeSupportsOptions } from "@/lib/form-ui";
+import Link from "next/link";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
 };
 
+type FormType = "registration" | "waiver" | "medical" | "custom";
+
 type GeneratedForm = {
-  aiActionId: string;
+  id: string;
   preview: {
     formName: string;
-    formType: string;
+    formType: FormType;
     fieldCount: number;
     fields: Array<{
       label: string;
@@ -44,7 +50,43 @@ type GeneratedForm = {
       hasOptions?: boolean;
     }>;
   };
+  params?: {
+    generatedForm?: AIGeneratedForm;
+  };
 };
+
+type AIGeneratedForm = {
+  formDefinition: {
+    name: string;
+    description: string;
+    formType: FormType;
+  };
+  fields: Array<{
+    fieldKey: string;
+    label: string;
+    fieldType: string;
+    description?: string;
+    validationRules?: {
+      required?: boolean;
+      minLength?: number;
+      maxLength?: number;
+      min?: number;
+      max?: number;
+      pattern?: string;
+    };
+    displayOrder: number;
+    sectionName?: string;
+    conditionalLogic?: unknown;
+    options?: Array<{
+      label: string;
+      value: string;
+      displayOrder: number;
+      triggersFields?: { fieldKeys?: string[] };
+    }>;
+  }>;
+};
+
+const ALL_SESSIONS_VALUE = "__all_sessions__";
 
 export default function AIFormChat() {
   const router = useRouter();
@@ -52,20 +94,22 @@ export default function AIFormChat() {
   const [sessions, setSessions] = useState<
     Array<{ id: string; campId: string; startDate: Date }>
   >([]);
-  const [selectedCamp, setSelectedCamp] = useState<string>("");
-  const [selectedSession, setSelectedSession] = useState<string>("");
+  const [selectedCamp, setSelectedCamp] = useState<string | undefined>();
+  const [selectedSession, setSelectedSession] =
+    useState<string>(ALL_SESSIONS_VALUE);
 
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
-        "Hi! I'll help you create a custom form. First, select a camp (or leave blank for camp-wide form). Then describe what information you need to collect.",
+        "Hi! I'll help you create a custom form. First, select a camp. Optionally choose a specific session (or keep “All sessions”). Then describe what information you need to collect.",
     },
   ]);
   const [input, setInput] = useState("");
   const [generatedForm, setGeneratedForm] = useState<GeneratedForm | null>(
     null
   );
+  const [draft, setDraft] = useState<AIGeneratedForm | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch camps and sessions
@@ -83,6 +127,14 @@ export default function AIFormChat() {
     fetchData();
   }, []);
 
+  // Default to first camp once loaded
+  useEffect(() => {
+    if (!selectedCamp && camps.length > 0) {
+      setSelectedCamp(camps[0].id);
+      setSelectedSession(ALL_SESSIONS_VALUE);
+    }
+  }, [camps, selectedCamp]);
+
   const filteredSessions = selectedCamp
     ? sessions.filter((s) => s.campId === selectedCamp)
     : [];
@@ -96,24 +148,27 @@ export default function AIFormChat() {
     setLoading(true);
 
     try {
-      // Get first available camp if none selected
-      if (!selectedCamp && camps.length > 0) {
-        setSelectedCamp(camps[0].id);
+      if (!selectedCamp) {
+        throw new Error("Please select a camp first.");
       }
 
       // Call AI form generation
-      const result = await generateFormAction({
+      const result = (await generateFormAction({
         prompt: userMessage,
-        campId: selectedCamp || camps[0]?.id || "",
-        sessionId: selectedSession || undefined,
-      });
+        campId: selectedCamp,
+        sessionId:
+          selectedSession === ALL_SESSIONS_VALUE ? undefined : selectedSession,
+      })) as unknown as GeneratedForm;
 
-      setGeneratedForm(result as unknown as GeneratedForm);
+      setGeneratedForm(result);
+      setDraft(result.params?.generatedForm ?? null);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `I've generated "${result.preview.formName}" with ${result.preview.fieldCount} fields. Review it below and approve if it looks good!`,
+          content:
+            `I've generated "${result.preview.formName}" with ${result.preview.fieldCount} fields. ` +
+            "Review and edit it on the right, then approve & save when ready.",
         },
       ]);
     } catch (error) {
@@ -134,7 +189,10 @@ export default function AIFormChat() {
 
     setLoading(true);
     try {
-      await approveAIFormAction(generatedForm.aiActionId);
+      await approveAIFormAction({
+        aiActionId: generatedForm.id,
+        generatedForm: draft ?? undefined,
+      });
       router.push("/dashboard/admin/forms");
     } catch (error) {
       alert(
@@ -147,6 +205,7 @@ export default function AIFormChat() {
 
   const handleReject = () => {
     setGeneratedForm(null);
+    setDraft(null);
     setMessages((prev) => [
       ...prev,
       {
@@ -160,6 +219,12 @@ export default function AIFormChat() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
+          <Link href="/dashboard/admin/forms" className="inline-flex">
+            <Button variant="ghost" className="-ml-3">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Forms
+            </Button>
+          </Link>
           <h1 className="text-3xl font-bold mb-2">
             <Sparkles className="inline h-6 w-6 mr-2 text-blue-500" />
             AI Form Generator
@@ -178,12 +243,18 @@ export default function AIFormChat() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="camp-select">Camp</Label>
-                <Select value={selectedCamp} onValueChange={setSelectedCamp}>
+                <Select
+                  value={selectedCamp}
+                  onValueChange={(value) => {
+                    setSelectedCamp(value);
+                    setSelectedSession(ALL_SESSIONS_VALUE);
+                  }}
+                  disabled={camps.length === 0}
+                >
                   <SelectTrigger id="camp-select">
-                    <SelectValue placeholder="Camp-wide form (default)" />
+                    <SelectValue placeholder="Select a camp" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Camp-wide (all sessions)</SelectItem>
                     {camps.map((camp) => (
                       <SelectItem key={camp.id} value={camp.id}>
                         {camp.name}
@@ -203,7 +274,9 @@ export default function AIFormChat() {
                     <SelectValue placeholder="All sessions in camp" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All sessions</SelectItem>
+                    <SelectItem value={ALL_SESSIONS_VALUE}>
+                      All sessions
+                    </SelectItem>
                     {filteredSessions.map((session) => (
                       <SelectItem key={session.id} value={session.id}>
                         {new Date(session.startDate).toLocaleDateString()}
@@ -214,7 +287,7 @@ export default function AIFormChat() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Leave blank to create a camp-wide form visible to all parents
+              Pick a session to target it, or keep “All sessions” for camp-wide
             </p>
           </CardContent>
         </Card>
@@ -273,7 +346,7 @@ export default function AIFormChat() {
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Example: Registration form with name, age, and t-shirt size"
+                  placeholder="Example: Registration form with camper name, age, and t‑shirt size"
                   disabled={loading}
                 />
                 <Button type="submit" disabled={loading || !input.trim()}>
@@ -284,101 +357,543 @@ export default function AIFormChat() {
           </Card>
 
           {/* Preview Panel */}
-          <Card className="h-[600px] overflow-y-auto">
+          <Card className="h-[600px] overflow-hidden flex flex-col">
             <CardHeader>
               <CardTitle>Form Preview</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-y-auto">
               {generatedForm ? (
                 <div className="space-y-6">
-                  {/* Form metadata */}
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold">
-                      {generatedForm.preview.formName}
-                    </h3>
-                    <div className="flex gap-2">
-                      <Badge>{generatedForm.preview.formType}</Badge>
-                      <Badge variant="outline">
-                        {generatedForm.preview.fieldCount} fields
-                      </Badge>
+                  {/* Editable metadata */}
+                  <div className="space-y-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="form-name">Form name</Label>
+                      <Input
+                        id="form-name"
+                        value={draft?.formDefinition.name ?? generatedForm.preview.formName}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              formDefinition: {
+                                ...prev.formDefinition,
+                                name: e.target.value,
+                              },
+                            };
+                          })
+                        }
+                        disabled={!draft || loading}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="form-description">Description</Label>
+                      <Textarea
+                        id="form-description"
+                        value={draft?.formDefinition.description ?? ""}
+                        onChange={(e) =>
+                          setDraft((prev) => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              formDefinition: {
+                                ...prev.formDefinition,
+                                description: e.target.value,
+                              },
+                            };
+                          })
+                        }
+                        placeholder="What is this form for?"
+                        disabled={!draft || loading}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Form type</Label>
+                      <Select
+                        value={draft?.formDefinition.formType ?? generatedForm.preview.formType}
+                        onValueChange={(value) =>
+                          setDraft((prev) => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              formDefinition: {
+                                ...prev.formDefinition,
+                                formType: value as FormType,
+                              },
+                            };
+                          })
+                        }
+                        disabled={!draft || loading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="registration">Registration</SelectItem>
+                          <SelectItem value="waiver">Waiver</SelectItem>
+                          <SelectItem value="medical">Medical</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  {/* Field list */}
-                  <div className="space-y-3">
-                    {generatedForm.preview.fields.map((field, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 border rounded-lg bg-muted/30"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium">{field.label}</p>
-                            <div className="flex gap-2 mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                {field.type}
-                              </Badge>
-                              {field.required && (
-                                <Badge
-                                  variant="destructive"
-                                  className="text-xs"
+                  {/* Editable field list (falls back to preview if draft missing) */}
+                  {draft ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">
+                          Fields ({draft.fields.length})
+                        </h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={loading}
+                          onClick={() =>
+                            setDraft((prev) => {
+                              if (!prev) return prev;
+                              const nextIndex = prev.fields.length + 1;
+                              return {
+                                ...prev,
+                                fields: [
+                                  ...prev.fields,
+                                  {
+                                    fieldKey: `new_field_${nextIndex}`,
+                                    label: `New field ${nextIndex}`,
+                                    fieldType: "text",
+                                    displayOrder: nextIndex,
+                                    validationRules: { required: false },
+                                  },
+                                ],
+                              };
+                            })
+                          }
+                        >
+                          Add field
+                        </Button>
+                      </div>
+
+                      {draft.fields
+                        .slice()
+                        .sort((a, b) => a.displayOrder - b.displayOrder)
+                        .map((field, idx) => (
+                          <div
+                            key={`${field.fieldKey}-${idx}`}
+                            className="p-4 border rounded-lg bg-muted/20 space-y-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-2">
+                                <div className="grid gap-2">
+                                  <Label>Question</Label>
+                                  <Input
+                                    value={field.label}
+                                    onChange={(e) =>
+                                      setDraft((prev) => {
+                                        if (!prev) return prev;
+                                        return {
+                                          ...prev,
+                                          fields: prev.fields.map((f) =>
+                                            f.fieldKey === field.fieldKey
+                                              ? { ...f, label: e.target.value }
+                                              : f
+                                          ),
+                                        };
+                                      })
+                                    }
+                                    disabled={loading}
+                                  />
+                                </div>
+
+                                <div className="grid gap-2">
+                                  <Label>Help text (optional)</Label>
+                                  <Textarea
+                                    value={field.description ?? ""}
+                                    onChange={(e) =>
+                                      setDraft((prev) => {
+                                        if (!prev) return prev;
+                                        return {
+                                          ...prev,
+                                          fields: prev.fields.map((f) =>
+                                            f.fieldKey === field.fieldKey
+                                              ? {
+                                                  ...f,
+                                                  description: e.target.value,
+                                                }
+                                              : f
+                                          ),
+                                        };
+                                      })
+                                    }
+                                    disabled={loading}
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="grid gap-2">
+                                    <Label>Answer type</Label>
+                                    <Select
+                                      value={field.fieldType}
+                                      onValueChange={(value) =>
+                                        setDraft((prev) => {
+                                          if (!prev) return prev;
+                                          return {
+                                            ...prev,
+                                            fields: prev.fields.map((f) => {
+                                              if (f.fieldKey !== field.fieldKey)
+                                                return f;
+                                              const next: typeof f = {
+                                                ...f,
+                                                fieldType: value,
+                                              };
+                                              if (
+                                                fieldTypeSupportsOptions(value) &&
+                                                (!next.options ||
+                                                  next.options.length === 0)
+                                              ) {
+                                                next.options = [
+                                                  { label: "Option 1", value: "option_1", displayOrder: 1 },
+                                                  { label: "Option 2", value: "option_2", displayOrder: 2 },
+                                                ];
+                                              }
+                                              return next;
+                                            }),
+                                          };
+                                        })
+                                      }
+                                      disabled={loading}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {FIELD_TYPE_OPTIONS.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-3 pt-7">
+                                    <div className="space-y-0.5">
+                                      <Label>Required</Label>
+                                      <p className="text-xs text-muted-foreground">
+                                        Must be answered
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={!!field.validationRules?.required}
+                                      onCheckedChange={(checked) =>
+                                        setDraft((prev) => {
+                                          if (!prev) return prev;
+                                          return {
+                                            ...prev,
+                                            fields: prev.fields.map((f) =>
+                                              f.fieldKey === field.fieldKey
+                                                ? {
+                                                    ...f,
+                                                    validationRules: {
+                                                      ...(f.validationRules ?? {}),
+                                                      required: checked,
+                                                    },
+                                                  }
+                                                : f
+                                            ),
+                                          };
+                                        })
+                                      }
+                                      disabled={loading}
+                                    />
+                                  </div>
+                                </div>
+
+                                <p className="text-xs text-muted-foreground">
+                                  Key: <span className="font-mono">{field.fieldKey}</span>
+                                </p>
+                              </div>
+
+                              <div className="flex flex-col gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={loading || idx === 0}
+                                  onClick={() =>
+                                    setDraft((prev) => {
+                                      if (!prev) return prev;
+                                      const sorted = prev.fields
+                                        .slice()
+                                        .sort((a, b) => a.displayOrder - b.displayOrder);
+                                      const current = sorted[idx];
+                                      const above = sorted[idx - 1];
+                                      return {
+                                        ...prev,
+                                        fields: prev.fields.map((f) => {
+                                          if (f.fieldKey === current.fieldKey)
+                                            return { ...f, displayOrder: above.displayOrder };
+                                          if (f.fieldKey === above.fieldKey)
+                                            return { ...f, displayOrder: current.displayOrder };
+                                          return f;
+                                        }),
+                                      };
+                                    })
+                                  }
                                 >
-                                  Required
-                                </Badge>
-                              )}
-                              {field.conditional && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Conditional
-                                </Badge>
-                              )}
-                              {field.hasOptions && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Has Options
-                                </Badge>
-                              )}
+                                  Up
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={loading || idx === draft.fields.length - 1}
+                                  onClick={() =>
+                                    setDraft((prev) => {
+                                      if (!prev) return prev;
+                                      const sorted = prev.fields
+                                        .slice()
+                                        .sort((a, b) => a.displayOrder - b.displayOrder);
+                                      const current = sorted[idx];
+                                      const below = sorted[idx + 1];
+                                      return {
+                                        ...prev,
+                                        fields: prev.fields.map((f) => {
+                                          if (f.fieldKey === current.fieldKey)
+                                            return { ...f, displayOrder: below.displayOrder };
+                                          if (f.fieldKey === below.fieldKey)
+                                            return { ...f, displayOrder: current.displayOrder };
+                                          return f;
+                                        }),
+                                      };
+                                    })
+                                  }
+                                >
+                                  Down
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  disabled={loading}
+                                  onClick={() =>
+                                    setDraft((prev) => {
+                                      if (!prev) return prev;
+                                      const nextFields = prev.fields
+                                        .filter((f) => f.fieldKey !== field.fieldKey)
+                                        .map((f, index) => ({
+                                          ...f,
+                                          displayOrder: index + 1,
+                                        }));
+                                      return { ...prev, fields: nextFields };
+                                    })
+                                  }
+                                >
+                                  Remove
+                                </Button>
+                              </div>
                             </div>
+
+                            {fieldTypeSupportsOptions(field.fieldType) && (
+                              <div className="pt-2 border-t space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium">Options</p>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={loading}
+                                    onClick={() =>
+                                      setDraft((prev) => {
+                                        if (!prev) return prev;
+                                        return {
+                                          ...prev,
+                                          fields: prev.fields.map((f) => {
+                                            if (f.fieldKey !== field.fieldKey) return f;
+                                            const options = f.options ? [...f.options] : [];
+                                            const nextOrder = options.length + 1;
+                                            options.push({
+                                              label: `Option ${nextOrder}`,
+                                              value: `option_${nextOrder}`,
+                                              displayOrder: nextOrder,
+                                            });
+                                            return { ...f, options };
+                                          }),
+                                        };
+                                      })
+                                    }
+                                  >
+                                    Add option
+                                  </Button>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {(field.options ?? [])
+                                    .slice()
+                                    .sort((a, b) => a.displayOrder - b.displayOrder)
+                                    .map((opt, optIdx) => (
+                                      <div
+                                        key={`${field.fieldKey}-opt-${optIdx}`}
+                                        className="grid grid-cols-[1fr,1fr,auto] gap-2 items-start"
+                                      >
+                                        <Input
+                                          value={opt.label}
+                                          onChange={(e) =>
+                                            setDraft((prev) => {
+                                              if (!prev) return prev;
+                                              return {
+                                                ...prev,
+                                                fields: prev.fields.map((f) => {
+                                                  if (f.fieldKey !== field.fieldKey) return f;
+                                                  const options = (f.options ?? []).map((o) =>
+                                                    o.displayOrder === opt.displayOrder
+                                                      ? { ...o, label: e.target.value }
+                                                      : o
+                                                  );
+                                                  return { ...f, options };
+                                                }),
+                                              };
+                                            })
+                                          }
+                                          disabled={loading}
+                                          placeholder="Label"
+                                        />
+                                        <Input
+                                          value={opt.value}
+                                          onChange={(e) =>
+                                            setDraft((prev) => {
+                                              if (!prev) return prev;
+                                              return {
+                                                ...prev,
+                                                fields: prev.fields.map((f) => {
+                                                  if (f.fieldKey !== field.fieldKey) return f;
+                                                  const options = (f.options ?? []).map((o) =>
+                                                    o.displayOrder === opt.displayOrder
+                                                      ? { ...o, value: e.target.value }
+                                                      : o
+                                                  );
+                                                  return { ...f, options };
+                                                }),
+                                              };
+                                            })
+                                          }
+                                          disabled={loading}
+                                          placeholder="Value"
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          disabled={loading}
+                                          onClick={() =>
+                                            setDraft((prev) => {
+                                              if (!prev) return prev;
+                                              return {
+                                                ...prev,
+                                                fields: prev.fields.map((f) => {
+                                                  if (f.fieldKey !== field.fieldKey) return f;
+                                                  const next = (f.options ?? [])
+                                                    .filter((o) => o.displayOrder !== opt.displayOrder)
+                                                    .map((o, index) => ({
+                                                      ...o,
+                                                      displayOrder: index + 1,
+                                                    }));
+                                                  return { ...f, options: next };
+                                                }),
+                                              };
+                                            })
+                                          }
+                                        >
+                                          Remove
+                                        </Button>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Badge>{generatedForm.preview.formType}</Badge>
+                        <Badge variant="outline">
+                          {generatedForm.preview.fieldCount} fields
+                        </Badge>
+                      </div>
+                      {generatedForm.preview.fields.map((field, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 border rounded-lg bg-muted/30"
+                        >
+                          <p className="font-medium">{field.label}</p>
+                          <div className="flex gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {field.type}
+                            </Badge>
+                            {field.required && (
+                              <Badge variant="destructive" className="text-xs">
+                                Required
+                              </Badge>
+                            )}
+                            {field.conditional && (
+                              <Badge variant="secondary" className="text-xs">
+                                Conditional
+                              </Badge>
+                            )}
+                            {field.hasOptions && (
+                              <Badge variant="secondary" className="text-xs">
+                                Has Options
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
 
-                  {/* Approval Actions */}
-                  <div className="flex gap-2 pt-4 border-t">
-                    <Button
-                      onClick={handleReject}
-                      variant="outline"
-                      className="flex-1"
-                      disabled={loading}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Regenerate
-                    </Button>
-                    <Button
-                      onClick={handleApprove}
-                      className="flex-1"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          Approve & Save
-                        </>
-                      )}
-                    </Button>
-                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p>Form preview will appear here</p>
+                  <p>Generate a form to preview and edit it here</p>
                 </div>
               )}
             </CardContent>
+            {generatedForm && (
+              <div className="border-t bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 p-4">
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleReject}
+                    variant="outline"
+                    className="flex-1"
+                    disabled={loading}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Regenerate
+                  </Button>
+                  <Button
+                    onClick={handleApprove}
+                    className="flex-1"
+                    disabled={loading || !generatedForm}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Approve & Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       </div>

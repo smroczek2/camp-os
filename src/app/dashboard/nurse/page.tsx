@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
-import { children, medications, medicationLogs, incidents } from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
-import { Heart, AlertCircle, Pill, Activity, Users, FileText } from "lucide-react";
+import { AlertCircle, Pill, Activity, Users } from "lucide-react";
 
 export default async function NurseDashboard() {
   const session = await getSession();
@@ -300,4 +299,3 @@ export default async function NurseDashboard() {
     </div>
   );
 }
-

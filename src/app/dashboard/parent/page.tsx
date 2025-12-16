@@ -180,7 +180,7 @@ export default async function ParentDashboard() {
                       )}
                       <p className="text-sm text-muted-foreground">
                         {form.fields?.length || 0} fields •{" "}
-                        {(form.session as any)?.camp?.name || "Camp-wide"}
+                        {form.session?.camp?.name ?? "Camp-wide"}
                       </p>
                     </div>
                     <div>

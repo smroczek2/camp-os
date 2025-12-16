@@ -63,6 +63,7 @@ export async function getDevUser() {
       email: userRecord.email,
       image: userRecord.image,
       emailVerified: userRecord.emailVerified,
+      role: userRecord.role, // CRITICAL: Include role for RBAC checks
     },
     session: {
       id: "dev-session",

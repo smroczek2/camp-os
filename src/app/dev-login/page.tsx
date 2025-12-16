@@ -74,13 +74,13 @@ const DEV_USERS = [
 export default function DevLoginPage() {
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handleDevLogin = async (userId: string) => {
-    setLoading(userId);
+  const handleDevLogin = async (email: string) => {
+    setLoading(email);
     try {
       const response = await fetch("/api/dev-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ email }),
       });
 
       if (response.ok) {
@@ -133,7 +133,7 @@ export default function DevLoginPage() {
                 <Card
                   key={user.id}
                   className="border-2 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                  onClick={() => handleDevLogin(user.id)}
+                  onClick={() => handleDevLogin(user.email)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between mb-4">
@@ -157,13 +157,13 @@ export default function DevLoginPage() {
                     </p>
                     <Button
                       className="w-full"
-                      disabled={loading === user.id}
+                      disabled={loading === user.email}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDevLogin(user.id);
+                        handleDevLogin(user.email);
                       }}
                     >
-                      {loading === user.id ? "Logging in..." : "Login as " + user.name.split(" ")[0]}
+                      {loading === user.email ? "Logging in..." : "Login as " + user.name.split(" ")[0]}
                     </Button>
                   </CardContent>
                 </Card>

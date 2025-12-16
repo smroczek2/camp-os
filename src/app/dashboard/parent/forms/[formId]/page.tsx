@@ -14,16 +14,16 @@ export default async function ParentFormPage({
   const session = await getSession();
   if (!session?.user) redirect("/dev-login");
 
-  let formConfig;
+  let formConfig: Awaited<ReturnType<typeof getFormAction>> | null = null;
   try {
     formConfig = await getFormAction(params.formId);
-  } catch (error) {
+  } catch {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="p-8 text-center">
           <h1 className="text-2xl font-bold mb-2">Form Not Available</h1>
           <p className="text-muted-foreground">
-            This form is not available or you don't have permission to access
+            This form is not available or you do not have permission to access
             it.
           </p>
         </Card>
@@ -37,7 +37,7 @@ export default async function ParentFormPage({
         <Card className="p-8 text-center">
           <h1 className="text-2xl font-bold mb-2">Form Not Found</h1>
           <p className="text-muted-foreground">
-            This form doesn't exist or has been removed.
+            This form does not exist or has been removed.
           </p>
         </Card>
       </div>
@@ -56,8 +56,7 @@ export default async function ParentFormPage({
 
         <Card className="p-6">
           <DynamicForm
-            formConfig={formConfig as any}
-            userId={session.user.id}
+            formConfig={formConfig}
             childId={searchParams.childId}
           />
         </Card>

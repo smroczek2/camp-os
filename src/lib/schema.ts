@@ -9,6 +9,7 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -417,16 +418,14 @@ export const formFields = pgTable(
   })
 );
 
-export const formOptions: any = pgTable(
+export const formOptions = pgTable(
   "form_options",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     formFieldId: uuid("form_field_id")
       .references(() => formFields.id, { onDelete: "cascade" })
       .notNull(),
-    parentOptionId: uuid("parent_option_id").references(() => formOptions.id, {
-      onDelete: "cascade",
-    }), // Self-reference for nesting
+    parentOptionId: uuid("parent_option_id"), // Self-reference for nesting (FK defined below)
     label: text("label").notNull(),
     value: text("value").notNull(),
     displayOrder: integer("display_order").notNull(),
@@ -439,6 +438,11 @@ export const formOptions: any = pgTable(
       table.displayOrder
     ),
     parentIdx: index("form_options_parent_idx").on(table.parentOptionId),
+    parentOptionFk: foreignKey({
+      name: "form_options_parent_option_id_fk",
+      columns: [table.parentOptionId],
+      foreignColumns: [table.id],
+    }).onDelete("cascade"),
   })
 );
 
@@ -679,7 +683,7 @@ export const formFieldsRelations = relations(formFields, ({ one, many }) => ({
   options: many(formOptions),
 }));
 
-export const formOptionsRelations: any = relations(formOptions, ({ one, many }) => ({
+export const formOptionsRelations = relations(formOptions, ({ one, many }) => ({
   formField: one(formFields, {
     fields: [formOptions.formFieldId],
     references: [formFields.id],
