@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -34,7 +35,7 @@ type FormFieldEditorProps = {
   onRemoveOption: (fieldId: string, optionId: string) => void;
 };
 
-export function FormFieldEditor({
+export const FormFieldEditor = memo(function FormFieldEditor({
   field,
   index,
   disabled = false,
@@ -192,4 +193,4 @@ export function FormFieldEditor({
       )}
     </div>
   );
-}
+});

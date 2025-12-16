@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { FormFieldDetails } from "./types";
 import { fieldTypeSupportsOptions, getFieldTypeLabel } from "@/lib/form-ui";
@@ -7,7 +8,7 @@ type FormFieldDisplayProps = {
   index: number;
 };
 
-export function FormFieldDisplay({ field, index }: FormFieldDisplayProps) {
+export const FormFieldDisplay = memo(function FormFieldDisplay({ field, index }: FormFieldDisplayProps) {
   return (
     <div className="p-4 border rounded-lg bg-muted/30">
       <div className="flex items-start justify-between">
@@ -57,4 +58,4 @@ export function FormFieldDisplay({ field, index }: FormFieldDisplayProps) {
         )}
     </div>
   );
-}
+});

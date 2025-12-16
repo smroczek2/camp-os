@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { buildSubmissionSchema, type FieldType } from "@/lib/form-validation";
@@ -17,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { isReservedFieldKey } from "@/lib/form-ui";
@@ -116,44 +116,62 @@ export function DynamicForm({
     }
   }, [form, formConfig.id, mode]);
 
-  // Check if field should be visible based on conditional logic
-  const shouldShowField = (field: FormConfig["fields"][0]) => {
-    if (!field.conditionalLogic?.showIf) return true;
+  // Helper to check if value exists (type narrowing)
+  const hasValue = useCallback((val: unknown): val is string | number | boolean | string[] => {
+    return val !== null && val !== undefined && val !== "";
+  }, []);
 
-    return field.conditionalLogic.showIf.every((condition) => {
-      // Type-safe field value access
-      const fieldValue = formValues?.[condition.fieldKey];
+  // Memoize field visibility to avoid recalculating on every render
+  const visibleFieldIds = useMemo(() => {
+    const visible = new Set<string>();
 
-      // Helper to check if value exists (type narrowing)
-      const hasValue = (val: unknown): val is string | number | boolean | string[] => {
-        return val !== null && val !== undefined && val !== "";
-      };
+    formConfig.fields.forEach((field) => {
+      if (!field.conditionalLogic?.showIf) {
+        visible.add(field.id);
+        return;
+      }
 
-      switch (condition.operator) {
-        case "equals":
-          return fieldValue === condition.value;
-        case "notEquals":
-          return fieldValue !== condition.value;
-        case "contains": {
-          // Type-safe array check
-          if (Array.isArray(fieldValue) && typeof condition.value === "string") {
-            return fieldValue.includes(condition.value);
+      const isVisible = field.conditionalLogic.showIf.every((condition) => {
+        // Type-safe field value access
+        const fieldValue = formValues?.[condition.fieldKey];
+
+        switch (condition.operator) {
+          case "equals":
+            return fieldValue === condition.value;
+          case "notEquals":
+            return fieldValue !== condition.value;
+          case "contains": {
+            // Type-safe array check
+            if (Array.isArray(fieldValue) && typeof condition.value === "string") {
+              return fieldValue.includes(condition.value);
+            }
+            // Type-safe string check
+            if (typeof fieldValue === "string" && typeof condition.value === "string") {
+              return fieldValue.includes(condition.value);
+            }
+            return false;
           }
-          // Type-safe string check
-          if (typeof fieldValue === "string" && typeof condition.value === "string") {
-            return fieldValue.includes(condition.value);
-          }
-          return false;
+          case "isEmpty":
+            return !hasValue(fieldValue);
+          case "isNotEmpty":
+            return hasValue(fieldValue);
+          default:
+            return true;
         }
-        case "isEmpty":
-          return !hasValue(fieldValue);
-        case "isNotEmpty":
-          return hasValue(fieldValue);
-        default:
-          return true;
+      });
+
+      if (isVisible) {
+        visible.add(field.id);
       }
     });
-  };
+
+    return visible;
+  }, [formConfig.fields, formValues, hasValue]);
+
+  // Check if field should be visible (now just a Set lookup)
+  const shouldShowField = useCallback((field: FormConfig["fields"][0]) => {
+    return visibleFieldIds.has(field.id);
+  }, [visibleFieldIds]);
 
   const onSubmit = async (data: Record<string, unknown>) => {
     if (mode === "preview") {

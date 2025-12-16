@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,8 +40,10 @@ export function FormFieldList({
   onUpdateOption,
   onRemoveOption,
 }: FormFieldListProps) {
-  const sortedFields = [...fields].sort(
-    (a, b) => a.displayOrder - b.displayOrder
+  // Memoize sorted fields to avoid re-sorting on every render
+  const sortedFields = useMemo(
+    () => [...fields].sort((a, b) => a.displayOrder - b.displayOrder),
+    [fields]
   );
 
   return (

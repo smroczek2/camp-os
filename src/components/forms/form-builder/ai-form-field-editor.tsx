@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -52,7 +53,7 @@ type AIFormFieldEditorProps = {
   onRemoveOption: (fieldKey: string, optionDisplayOrder: number) => void;
 };
 
-export function AIFormFieldEditor({
+export const AIFormFieldEditor = memo(function AIFormFieldEditor({
   field,
   index,
   totalFields,
@@ -233,4 +234,4 @@ export function AIFormFieldEditor({
       )}
     </div>
   );
-}
+});
