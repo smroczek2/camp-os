@@ -12,8 +12,13 @@ import {
 import { sanitizeGeneratedForm } from "@/lib/ai-tools/form-builder-tool";
 import { ForbiddenError } from "@/lib/rbac";
 import { db } from "@/lib/db";
-import { aiActions, events } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { aiActions, events, children, registrations } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
+import { rateLimiters, checkRateLimit } from "@/lib/rate-limit";
+import type {
+  GeneratedFormResult,
+  AIFormGeneration,
+} from "@/types/forms";
 
 /**
  * Submit a form (parents submit forms for their children)
@@ -37,6 +42,36 @@ export async function submitFormAction(data: {
   const canAccess = await canAccessForm(session.user.id, data.formDefinitionId);
   if (!canAccess) {
     throw new ForbiddenError("Cannot access this form");
+  }
+
+  // VALIDATE CHILD OWNERSHIP
+  if (data.childId) {
+    const child = await db.query.children.findFirst({
+      where: and(
+        eq(children.id, data.childId),
+        eq(children.userId, session.user.id)
+      ),
+      columns: { id: true }, // Only need ID for validation
+    });
+
+    if (!child) {
+      throw new ForbiddenError("Invalid child ID");
+    }
+  }
+
+  // VALIDATE REGISTRATION OWNERSHIP
+  if (data.registrationId) {
+    const registration = await db.query.registrations.findFirst({
+      where: and(
+        eq(registrations.id, data.registrationId),
+        eq(registrations.userId, session.user.id)
+      ),
+      columns: { id: true }, // Only need ID for validation
+    });
+
+    if (!registration) {
+      throw new ForbiddenError("Invalid registration ID");
+    }
   }
 
   return formService.submitForm({
@@ -115,19 +150,60 @@ export async function generateFormAction(data: {
   prompt: string;
   campId: string;
   sessionId?: string;
-}) {
+}): Promise<GeneratedFormResult> {
   const session = await getSession();
   if (!session?.user) {
     throw new Error("Unauthorized");
   }
 
+  // Rate limiting for AI form generation
+  const rateLimitResult = await checkRateLimit(
+    rateLimiters.formGeneration,
+    session.user.id
+  );
+
+  if (!rateLimitResult.success) {
+    const resetDate = new Date(rateLimitResult.reset);
+    throw new Error(
+      `Rate limit exceeded. You can generate ${rateLimitResult.limit} forms per day. Please try again after ${resetDate.toLocaleString()}.`
+    );
+  }
+
   // Permission check happens inside createFormGenerationAction
-  return createFormGenerationAction(
+  const result = await createFormGenerationAction(
     session.user.id,
     data.prompt,
     data.campId,
     data.sessionId
   );
+
+  // Return properly typed result
+  return {
+    id: result.id,
+    action: result.action,
+    params: result.params as {
+      prompt: string;
+      campId: string;
+      sessionId?: string;
+      generatedForm: AIFormGeneration;
+    },
+    preview: result.preview as {
+      formName: string;
+      formType: "registration" | "waiver" | "medical" | "custom";
+      fieldCount: number;
+      sections?: string[];
+      fields: Array<{
+        label: string;
+        type: string;
+        required: boolean;
+        conditional: boolean;
+        hasOptions: boolean;
+      }>;
+    },
+    status: result.status,
+    createdAt: result.createdAt,
+    userId: result.userId,
+  };
 }
 
 /**
@@ -135,25 +211,39 @@ export async function generateFormAction(data: {
  */
 export async function approveAIFormAction(data: {
   aiActionId: string;
-  generatedForm?: unknown;
-}) {
+  generatedForm?: AIFormGeneration;
+}): Promise<{ success: boolean; formId: string }> {
   const session = await getSession();
   if (!session?.user) {
     throw new Error("Unauthorized");
   }
 
+  // Rate limiting for AI form approval
+  const rateLimitResult = await checkRateLimit(
+    rateLimiters.formApproval,
+    session.user.id
+  );
+
+  if (!rateLimitResult.success) {
+    const resetDate = new Date(rateLimitResult.reset);
+    throw new Error(
+      `Rate limit exceeded. You can approve ${rateLimitResult.limit} forms per day. Please try again after ${resetDate.toLocaleString()}.`
+    );
+  }
+
   // Check permission
   await enforcePermission(session.user.id, "form", "create");
 
-  const { aiActionId, generatedForm } = z
+  // Validate input with proper typing
+  const validated = z
     .object({
       aiActionId: z.string().uuid(),
-      generatedForm: z.unknown().optional(),
+      generatedForm: aiFormGenerationSchema.optional(),
     })
     .parse(data);
 
   const aiAction = await db.query.aiActions.findFirst({
-    where: eq(aiActions.id, aiActionId),
+    where: eq(aiActions.id, validated.aiActionId),
   });
 
   if (!aiAction) {
@@ -164,14 +254,18 @@ export async function approveAIFormAction(data: {
     throw new Error(`AI action is ${aiAction.status} and cannot be approved`);
   }
 
-  const existingParams = aiAction.params as Record<string, unknown>;
-  const updatedGeneratedForm = generatedForm
-    ? sanitizeGeneratedForm(aiFormGenerationSchema.parse(generatedForm))
-    : sanitizeGeneratedForm(aiFormGenerationSchema.parse(existingParams.generatedForm));
+  // Parse existing params with proper typing
+  const existingParams = aiAction.params as {
+    prompt: string;
+    campId: string;
+    sessionId?: string;
+    generatedForm: unknown;
+  };
 
-  if (!updatedGeneratedForm) {
-    throw new Error("Missing generated form content");
-  }
+  // Determine which form to use and sanitize it
+  const updatedGeneratedForm = validated.generatedForm
+    ? sanitizeGeneratedForm(validated.generatedForm)
+    : sanitizeGeneratedForm(aiFormGenerationSchema.parse(existingParams.generatedForm));
 
   const updatedParams = {
     ...existingParams,
@@ -188,18 +282,23 @@ export async function approveAIFormAction(data: {
         params: updatedParams,
         preview: buildFormPreview(updatedGeneratedForm),
       })
-      .where(eq(aiActions.id, aiActionId));
+      .where(eq(aiActions.id, validated.aiActionId));
 
     await tx.insert(events).values({
-      streamId: `ai-action-${aiActionId}`,
+      streamId: `ai-action-${validated.aiActionId}`,
       eventType: "AIActionApproved",
-      eventData: { aiActionId },
+      eventData: { aiActionId: validated.aiActionId },
       version: 2,
       userId: session.user.id,
     });
   });
 
-  return formService.executeAIFormGeneration(aiActionId, session.user.id);
+  const result = await formService.executeAIFormGeneration(validated.aiActionId, session.user.id);
+
+  return {
+    success: true,
+    formId: result.id,
+  };
 }
 
 /**

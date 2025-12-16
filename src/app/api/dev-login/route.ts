@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { setDevUser } from "@/lib/dev-auth";
 import { db } from "@/lib/db";
 import { user } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { DEV_SESSION_COOKIE } from "@/lib/dev-auth";
 
 export async function POST(request: Request) {
   // Only allow in development
@@ -14,25 +14,29 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { email } = await request.json();
+    const body = (await request.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    const email = typeof body.email === "string" ? body.email : undefined;
+    const userId = typeof body.userId === "string" ? body.userId : undefined;
 
-    if (!email) {
-      return NextResponse.json({ error: "Email required" }, { status: 400 });
+    if (!email && !userId) {
+      return NextResponse.json(
+        { error: "Email or userId required" },
+        { status: 400 }
+      );
     }
 
-    // Look up user by email
     const userRecord = await db.query.user.findFirst({
-      where: eq(user.email, email),
+      where: userId ? eq(user.id, userId) : eq(user.email, email!),
     });
 
     if (!userRecord) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Set dev user cookie with actual user ID
-    await setDevUser(userRecord.id);
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         id: userRecord.id,
@@ -41,6 +45,16 @@ export async function POST(request: Request) {
         role: userRecord.role,
       },
     });
+
+    response.cookies.set(DEV_SESSION_COOKIE, userRecord.id, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24, // 24 hours
+      path: "/",
+    });
+
+    return response;
   } catch (error) {
     console.error("Dev login error:", error);
     return NextResponse.json(

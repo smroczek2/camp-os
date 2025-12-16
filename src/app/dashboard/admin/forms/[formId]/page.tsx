@@ -10,8 +10,9 @@ type FormType = "registration" | "waiver" | "medical" | "custom";
 export default async function FormDetailsPage({
   params,
 }: {
-  params: { formId: string };
+  params: Promise<{ formId: string }>;
 }) {
+  const { formId } = await params;
   const session = await getSession();
   if (!session?.user) {
     redirect("/dev-login");
@@ -25,7 +26,7 @@ export default async function FormDetailsPage({
   }
 
   const form = await db.query.formDefinitions.findFirst({
-    where: eq(formDefinitions.id, params.formId),
+    where: eq(formDefinitions.id, formId),
     with: {
       camp: true,
       session: true,

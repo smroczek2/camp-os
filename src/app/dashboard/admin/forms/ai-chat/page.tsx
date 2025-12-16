@@ -28,62 +28,15 @@ import {
 } from "@/app/actions/form-actions";
 import { FIELD_TYPE_OPTIONS, fieldTypeSupportsOptions } from "@/lib/form-ui";
 import Link from "next/link";
+import type {
+  FormType,
+  AIFormGeneration,
+  GeneratedFormResult,
+} from "@/types/forms";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
-};
-
-type FormType = "registration" | "waiver" | "medical" | "custom";
-
-type GeneratedForm = {
-  id: string;
-  preview: {
-    formName: string;
-    formType: FormType;
-    fieldCount: number;
-    fields: Array<{
-      label: string;
-      type: string;
-      required: boolean;
-      conditional?: boolean;
-      hasOptions?: boolean;
-    }>;
-  };
-  params?: {
-    generatedForm?: AIGeneratedForm;
-  };
-};
-
-type AIGeneratedForm = {
-  formDefinition: {
-    name: string;
-    description: string;
-    formType: FormType;
-  };
-  fields: Array<{
-    fieldKey: string;
-    label: string;
-    fieldType: string;
-    description?: string;
-    validationRules?: {
-      required?: boolean;
-      minLength?: number;
-      maxLength?: number;
-      min?: number;
-      max?: number;
-      pattern?: string;
-    };
-    displayOrder: number;
-    sectionName?: string;
-    conditionalLogic?: unknown;
-    options?: Array<{
-      label: string;
-      value: string;
-      displayOrder: number;
-      triggersFields?: { fieldKeys?: string[] };
-    }>;
-  }>;
 };
 
 const ALL_SESSIONS_VALUE = "__all_sessions__";
@@ -102,14 +55,14 @@ export default function AIFormChat() {
     {
       role: "assistant",
       content:
-        "Hi! I'll help you create a custom form. First, select a camp. Optionally choose a specific session (or keep “All sessions”). Then describe what information you need to collect.",
+        "Hi! I'll help you create a custom form. First, select a camp. Optionally choose a specific session (or keep \"All sessions\"). Then describe what information you need to collect.",
     },
   ]);
   const [input, setInput] = useState("");
-  const [generatedForm, setGeneratedForm] = useState<GeneratedForm | null>(
+  const [generatedForm, setGeneratedForm] = useState<GeneratedFormResult | null>(
     null
   );
-  const [draft, setDraft] = useState<AIGeneratedForm | null>(null);
+  const [draft, setDraft] = useState<AIFormGeneration | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch camps and sessions
@@ -153,15 +106,15 @@ export default function AIFormChat() {
       }
 
       // Call AI form generation
-      const result = (await generateFormAction({
+      const result = await generateFormAction({
         prompt: userMessage,
         campId: selectedCamp,
         sessionId:
           selectedSession === ALL_SESSIONS_VALUE ? undefined : selectedSession,
-      })) as unknown as GeneratedForm;
+      });
 
       setGeneratedForm(result);
-      setDraft(result.params?.generatedForm ?? null);
+      setDraft(result.params.generatedForm);
       setMessages((prev) => [
         ...prev,
         {

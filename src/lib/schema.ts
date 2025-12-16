@@ -372,6 +372,11 @@ export const formDefinitions = pgTable(
     campIdx: index("form_definitions_camp_idx").on(table.campId),
     sessionIdx: index("form_definitions_session_idx").on(table.sessionId),
     statusIdx: index("form_definitions_status_idx").on(table.status),
+    campSessionStatusIdx: index("form_definitions_camp_session_status_idx").on(
+      table.campId,
+      table.sessionId,
+      table.status
+    ),
   })
 );
 
@@ -397,7 +402,7 @@ export const formFields = pgTable(
     conditionalLogic: jsonb("conditional_logic").$type<{
       showIf?: Array<{
         fieldKey: string;
-        operator: "equals" | "notEquals" | "contains";
+        operator: "equals" | "notEquals" | "contains" | "isEmpty" | "isNotEmpty";
         value: string | number | boolean | string[];
       }>;
     }>(),
@@ -410,6 +415,10 @@ export const formFields = pgTable(
     formDefOrderIdx: index("form_fields_form_def_order_idx").on(
       table.formDefinitionId,
       table.displayOrder
+    ),
+    fieldKeyIdx: index("form_fields_field_key_idx").on(
+      table.formDefinitionId,
+      table.fieldKey
     ),
     uniqueFieldKey: uniqueIndex("form_fields_unique_key").on(
       table.formDefinitionId,
@@ -446,6 +455,29 @@ export const formOptions = pgTable(
   })
 );
 
+export const formSnapshots = pgTable(
+  "form_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    formDefinitionId: uuid("form_definition_id")
+      .references(() => formDefinitions.id, { onDelete: "cascade" })
+      .notNull(),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    formVersionIdx: index("form_snapshots_form_version_idx").on(
+      table.formDefinitionId,
+      table.version
+    ),
+    uniqueFormVersion: uniqueIndex("form_snapshots_unique_form_version").on(
+      table.formDefinitionId,
+      table.version
+    ),
+  })
+);
+
 export const formSubmissions = pgTable(
   "form_submissions",
   {
@@ -463,6 +495,7 @@ export const formSubmissions = pgTable(
     sessionId: uuid("session_id").references(() => sessions.id, {
       onDelete: "set null",
     }),
+    formVersion: integer("form_version").notNull(),
     status: text("status").notNull().default("submitted"), // draft, submitted, reviewed, approved
     submissionData: jsonb("submission_data")
       .notNull()
@@ -482,6 +515,15 @@ export const formSubmissions = pgTable(
     ),
     sessionIdx: index("form_submissions_session_idx").on(table.sessionId),
     statusIdx: index("form_submissions_status_idx").on(table.status),
+    userFormIdx: index("form_submissions_user_form_idx").on(
+      table.userId,
+      table.formDefinitionId,
+      table.submittedAt
+    ),
+    formVersionIdx: index("form_submissions_form_version_idx").on(
+      table.formDefinitionId,
+      table.formVersion
+    ),
   })
 );
 
@@ -672,8 +714,16 @@ export const formDefinitionsRelations = relations(
     }),
     fields: many(formFields),
     submissions: many(formSubmissions),
+    snapshots: many(formSnapshots),
   })
 );
+
+export const formSnapshotsRelations = relations(formSnapshots, ({ one }) => ({
+  formDefinition: one(formDefinitions, {
+    fields: [formSnapshots.formDefinitionId],
+    references: [formDefinitions.id],
+  }),
+}));
 
 export const formFieldsRelations = relations(formFields, ({ one, many }) => ({
   formDefinition: one(formDefinitions, {

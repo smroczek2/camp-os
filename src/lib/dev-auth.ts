@@ -11,7 +11,7 @@ import { cookies } from "next/headers";
  * all authentication and should NEVER be enabled in production.
  */
 
-const DEV_SESSION_COOKIE = "camp_os_dev_user_id";
+export const DEV_SESSION_COOKIE = "camp_os_dev_user_id";
 
 /**
  * Set a development user session

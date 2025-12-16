@@ -4,51 +4,13 @@ import {
   formFields,
   formOptions,
   formSubmissions,
+  formSnapshots,
   events,
   aiActions,
 } from "@/lib/schema";
 import { buildSubmissionSchema, type FieldType } from "@/lib/form-validation";
 import { eq, and, inArray } from "drizzle-orm";
-
-// Type for AI-generated form structure
-export type AIFormGeneration = {
-  formDefinition: {
-    name: string;
-    description: string;
-    formType: "registration" | "waiver" | "medical" | "custom";
-  };
-  fields: Array<{
-    fieldKey: string;
-    label: string;
-    fieldType: FieldType;
-    description?: string;
-    validationRules?: {
-      required?: boolean;
-      minLength?: number;
-      maxLength?: number;
-      min?: number;
-      max?: number;
-      pattern?: string;
-    };
-    conditionalLogic?: {
-      showIf?: Array<{
-        fieldKey: string;
-        operator: "equals" | "notEquals" | "contains";
-        value: string | number | boolean | string[];
-      }>;
-    };
-    displayOrder: number;
-    sectionName?: string;
-    options?: Array<{
-      label: string;
-      value: string;
-      displayOrder: number;
-      triggersFields?: {
-        fieldKeys?: string[];
-      };
-    }>;
-  }>;
-};
+import type { AIFormGeneration } from "@/types/forms";
 
 export class FormService {
   /**
@@ -71,6 +33,44 @@ export class FormService {
         },
       },
     });
+  }
+
+  /**
+   * Helper: Create a snapshot of the current form state
+   */
+  private async createSnapshot(
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    formId: string,
+    version: number
+  ) {
+    const completeForm = await tx.query.formDefinitions.findFirst({
+      where: eq(formDefinitions.id, formId),
+      with: {
+        fields: {
+          orderBy: (fields, { asc }) => [asc(fields.displayOrder)],
+          with: {
+            options: {
+              orderBy: (options, { asc }) => [asc(options.displayOrder)],
+              with: {
+                childOptions: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!completeForm) {
+      throw new Error("Form not found for snapshot");
+    }
+
+    await tx.insert(formSnapshots).values({
+      formDefinitionId: formId,
+      version,
+      snapshot: completeForm as unknown as Record<string, unknown>,
+    });
+
+    return completeForm;
   }
 
   /**
@@ -108,9 +108,38 @@ export class FormService {
       throw new Error("Form definition not found");
     }
 
-    // Build dynamic validation schema from form definition
+    // Get snapshot for the current version
+    const snapshot = await db.query.formSnapshots.findFirst({
+      where: and(
+        eq(formSnapshots.formDefinitionId, data.formDefinitionId),
+        eq(formSnapshots.version, formDef.version)
+      ),
+    });
+
+    if (!snapshot) {
+      throw new Error(
+        `Form snapshot not found for version ${formDef.version}. Please ensure the form is published.`
+      );
+    }
+
+    // Validate against the snapshot, not current form
+    const snapshotData = snapshot.snapshot as {
+      fields: Array<{
+        fieldKey: string;
+        fieldType: string;
+        validationRules?: {
+          required?: boolean;
+          minLength?: number;
+          maxLength?: number;
+          min?: number;
+          max?: number;
+          pattern?: string;
+        };
+      }>;
+    };
+
     const submissionSchema = buildSubmissionSchema(
-      formDef.fields.map((f) => ({
+      snapshotData.fields.map((f) => ({
         fieldKey: f.fieldKey,
         fieldType: f.fieldType as FieldType,
         validationRules: f.validationRules ?? undefined,
@@ -129,6 +158,7 @@ export class FormService {
           childId: data.childId,
           registrationId: data.registrationId,
           sessionId: data.sessionId,
+          formVersion: formDef.version,
           submissionData: validated,
           status: "submitted",
         })
@@ -141,6 +171,7 @@ export class FormService {
         eventData: {
           submissionId: submission.id,
           formId: data.formDefinitionId,
+          formVersion: formDef.version,
           userId: data.userId,
         },
         version: 1,
@@ -429,10 +460,20 @@ export class FormService {
         await tx.delete(formFields).where(inArray(formFields.id, toDelete));
       }
 
+      // Create snapshot of the new version (if form is published)
+      const formStatus = await tx.query.formDefinitions.findFirst({
+        where: eq(formDefinitions.id, formId),
+        columns: { isPublished: true },
+      });
+
+      if (formStatus?.isPublished) {
+        await this.createSnapshot(tx, formId, nextVersion);
+      }
+
       await tx.insert(events).values({
         streamId: `form-${formId}`,
         eventType: "FormUpdated",
-        eventData: { formId },
+        eventData: { formId, newVersion: nextVersion },
         version: nextVersion,
         userId,
       });
@@ -451,6 +492,19 @@ export class FormService {
    */
   async publishForm(formId: string, userId: string) {
     return db.transaction(async (tx) => {
+      // Get current form version before publishing
+      const currentForm = await tx.query.formDefinitions.findFirst({
+        where: eq(formDefinitions.id, formId),
+        columns: { version: true },
+      });
+
+      if (!currentForm) {
+        throw new Error("Form not found");
+      }
+
+      // Create snapshot before publishing
+      await this.createSnapshot(tx, formId, currentForm.version);
+
       const [form] = await tx
         .update(formDefinitions)
         .set({
@@ -465,8 +519,8 @@ export class FormService {
       await tx.insert(events).values({
         streamId: `form-${formId}`,
         eventType: "FormPublished",
-        eventData: { formId },
-        version: 2,
+        eventData: { formId, version: currentForm.version },
+        version: currentForm.version,
         userId,
       });
 

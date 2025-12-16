@@ -4,7 +4,7 @@ import { openai } from "@ai-sdk/openai";
 import { db } from "@/lib/db";
 import { aiActions, events } from "@/lib/schema";
 import { enforcePermission } from "@/lib/rbac";
-import type { AIFormGeneration } from "@/services/form-service";
+import type { AIFormGeneration } from "@/types/forms";
 import { getFieldTypeLabel, isReservedFieldKey } from "@/lib/form-ui";
 
 // AI schema for form generation

@@ -21,11 +21,18 @@ export function SignInButton() {
       setIsSigningIn(true);
       await signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/dashboard`
+            : "/dashboard",
       });
     } catch (error) {
       console.error("Sign in error:", error);
-      alert("Failed to sign in. Please check your authentication configuration.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to sign in. Please check your authentication configuration.";
+      alert(message);
     } finally {
       setIsSigningIn(false);
     }

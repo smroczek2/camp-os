@@ -35,7 +35,7 @@ type ConditionalLogic = {
   showIf?: Array<{
     fieldKey: string;
     operator: "equals" | "notEquals" | "contains" | "isEmpty" | "isNotEmpty";
-    value: unknown;
+    value: string | number | boolean | string[];
   }>;
 };
 
@@ -121,26 +121,34 @@ export function DynamicForm({
     if (!field.conditionalLogic?.showIf) return true;
 
     return field.conditionalLogic.showIf.every((condition) => {
-      const fieldValue = (formValues as Record<string, unknown> | undefined)?.[
-        condition.fieldKey
-      ];
+      // Type-safe field value access
+      const fieldValue = formValues?.[condition.fieldKey];
+
+      // Helper to check if value exists (type narrowing)
+      const hasValue = (val: unknown): val is string | number | boolean | string[] => {
+        return val !== null && val !== undefined && val !== "";
+      };
 
       switch (condition.operator) {
         case "equals":
           return fieldValue === condition.value;
         case "notEquals":
           return fieldValue !== condition.value;
-        case "contains":
-          if (Array.isArray(fieldValue)) {
+        case "contains": {
+          // Type-safe array check
+          if (Array.isArray(fieldValue) && typeof condition.value === "string") {
             return fieldValue.includes(condition.value);
           }
-          return fieldValue
-            ?.toString()
-            .includes((condition.value ?? "").toString());
+          // Type-safe string check
+          if (typeof fieldValue === "string" && typeof condition.value === "string") {
+            return fieldValue.includes(condition.value);
+          }
+          return false;
+        }
         case "isEmpty":
-          return !fieldValue || fieldValue === "";
+          return !hasValue(fieldValue);
         case "isNotEmpty":
-          return fieldValue && fieldValue !== "";
+          return hasValue(fieldValue);
         default:
           return true;
       }

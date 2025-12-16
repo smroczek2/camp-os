@@ -1,6 +1,8 @@
 import { getSession } from "@/lib/auth-helper";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { formDefinitions, camps, sessions, formFields, formSubmissions } from "@/lib/schema";
+import { eq, sql, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -20,17 +22,40 @@ export default async function FormsPage() {
     redirect("/dashboard");
   }
 
-  // Fetch all forms
-  const forms = await db.query.formDefinitions.findMany({
-    with: {
-      camp: { columns: { name: true } },
-      session: { columns: { id: true, startDate: true } },
-      fields: { columns: { id: true } },
-      submissions: { columns: { id: true } },
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    orderBy: (forms: any, { desc }: any) => [desc(forms.createdAt)],
-  });
+  // Fetch all forms with aggregated counts (optimized query)
+  const forms = await db
+    .select({
+      id: formDefinitions.id,
+      campId: formDefinitions.campId,
+      sessionId: formDefinitions.sessionId,
+      createdBy: formDefinitions.createdBy,
+      name: formDefinitions.name,
+      description: formDefinitions.description,
+      formType: formDefinitions.formType,
+      status: formDefinitions.status,
+      isPublished: formDefinitions.isPublished,
+      publishedAt: formDefinitions.publishedAt,
+      version: formDefinitions.version,
+      aiActionId: formDefinitions.aiActionId,
+      createdAt: formDefinitions.createdAt,
+      updatedAt: formDefinitions.updatedAt,
+      campName: camps.name,
+      sessionStartDate: sessions.startDate,
+      fieldCount: sql<number>`COUNT(DISTINCT ${formFields.id})`.as("field_count"),
+      submissionCount: sql<number>`COUNT(DISTINCT ${formSubmissions.id})`.as("submission_count"),
+    })
+    .from(formDefinitions)
+    .leftJoin(camps, eq(formDefinitions.campId, camps.id))
+    .leftJoin(sessions, eq(formDefinitions.sessionId, sessions.id))
+    .leftJoin(formFields, eq(formFields.formDefinitionId, formDefinitions.id))
+    .leftJoin(formSubmissions, eq(formSubmissions.formDefinitionId, formDefinitions.id))
+    .groupBy(
+      formDefinitions.id,
+      camps.name,
+      sessions.id,
+      sessions.startDate
+    )
+    .orderBy(desc(formDefinitions.createdAt));
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -106,12 +131,12 @@ export default async function FormsPage() {
             <CardContent>
               <div className="space-y-2 text-sm">
                 <p className="text-muted-foreground">
-                  {form.fields?.length || 0} fields •{" "}
-                  {form.camp?.name ?? "Unknown"}
+                  {form.fieldCount || 0} fields •{" "}
+                  {form.campName ?? "Unknown"}
                 </p>
-                {form.submissions && form.submissions.length > 0 && (
+                {form.submissionCount > 0 && (
                   <p className="text-muted-foreground">
-                    {form.submissions.length} submissions
+                    {form.submissionCount} submissions
                   </p>
                 )}
                 <div className="flex gap-2 mt-4">

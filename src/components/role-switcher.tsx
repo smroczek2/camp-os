@@ -16,36 +16,42 @@ const DEV_USERS = [
   {
     id: "parent-1",
     name: "Jennifer Smith (Parent)",
+    email: "jennifer.smith@example.com",
     role: "parent",
     icon: Users,
   },
   {
     id: "parent-2",
     name: "David Williams (Parent)",
+    email: "david.williams@example.com",
     role: "parent",
     icon: Users,
   },
   {
     id: "staff-1",
     name: "Sarah Johnson (Staff)",
+    email: "sarah.johnson@camposarai.co",
     role: "staff",
     icon: Activity,
   },
   {
     id: "staff-2",
     name: "Mike Chen (Staff)",
+    email: "mike.chen@camposarai.co",
     role: "staff",
     icon: Activity,
   },
   {
     id: "nurse-1",
     name: "Dr. Emily Martinez (Nurse)",
+    email: "emily.martinez@camposarai.co",
     role: "nurse",
     icon: Heart,
   },
   {
     id: "admin-1",
     name: "Admin User",
+    email: "admin@camposarai.co",
     role: "admin",
     icon: Shield,
   },
@@ -54,13 +60,13 @@ const DEV_USERS = [
 export function RoleSwitcher() {
   const [switching, setSwitching] = useState(false);
 
-  const switchRole = async (userId: string) => {
+  const switchRole = async (email: string) => {
     setSwitching(true);
     try {
       const response = await fetch("/api/dev-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ email }),
       });
 
       if (response.ok) {
@@ -97,7 +103,7 @@ export function RoleSwitcher() {
           return (
             <DropdownMenuItem
               key={user.id}
-              onClick={() => switchRole(user.id)}
+              onClick={() => switchRole(user.email)}
               disabled={switching}
               className="cursor-pointer"
             >

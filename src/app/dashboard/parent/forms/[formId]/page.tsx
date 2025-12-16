@@ -8,15 +8,17 @@ export default async function ParentFormPage({
   params,
   searchParams,
 }: {
-  params: { formId: string };
-  searchParams: { childId?: string };
+  params: Promise<{ formId: string }>;
+  searchParams: Promise<{ childId?: string }>;
 }) {
+  const { formId } = await params;
+  const { childId } = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/dev-login");
 
   let formConfig: Awaited<ReturnType<typeof getFormAction>> | null = null;
   try {
-    formConfig = await getFormAction(params.formId);
+    formConfig = await getFormAction(formId);
   } catch {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -57,7 +59,7 @@ export default async function ParentFormPage({
         <Card className="p-6">
           <DynamicForm
             formConfig={formConfig}
-            childId={searchParams.childId}
+            childId={childId}
           />
         </Card>
       </div>
