@@ -1,5 +1,13 @@
 import { db } from "@/lib/db";
-import { user, children, registrations, documents, assignments } from "@/lib/schema";
+import {
+  user,
+  children,
+  registrations,
+  documents,
+  assignments,
+  formDefinitions,
+  formSubmissions,
+} from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 
 export type UserRole = "parent" | "staff" | "admin" | "nurse";
@@ -12,6 +20,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
     medicalRecord: ["read", "update"],
     document: ["create", "read", "delete"],
     incident: ["read"],
+    form: ["read", "submit"],
+    formSubmission: ["read", "create"],
   },
   staff: {
     child: ["read"],
@@ -19,6 +29,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
     medication: ["read"],
     incident: ["create", "read", "update"],
     attendance: ["create", "update"],
+    form: ["read"],
+    formSubmission: ["read"],
   },
   nurse: {
     child: ["read"],
@@ -26,6 +38,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
     medication: ["create", "read", "update", "delete"],
     medicalRecord: ["read", "update"],
     incident: ["create", "read", "update", "resolve"],
+    form: ["read"],
+    formSubmission: ["read", "update"],
   },
   admin: {
     child: ["create", "read", "update", "delete"],
@@ -36,6 +50,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
     incident: ["create", "read", "update", "resolve"],
     session: ["create", "read", "update", "delete"],
     staff: ["read", "update"],
+    form: ["create", "read", "update", "delete"],
+    formSubmission: ["read", "update", "delete"],
   },
 };
 
@@ -195,4 +211,61 @@ export async function isAdmin(userId: string): Promise<boolean> {
 export async function isStaffOrAdmin(userId: string): Promise<boolean> {
   const role = await getUserRole(userId);
   return role === "staff" || role === "admin" || role === "nurse";
+}
+
+// Check if user can access a form
+export async function canAccessForm(
+  userId: string,
+  formId: string
+): Promise<boolean> {
+  const userRole = await getUserRole(userId);
+  if (userRole === "admin") return true;
+
+  const form = await db.query.formDefinitions.findFirst({
+    where: eq(formDefinitions.id, formId),
+  });
+
+  if (!form) return false;
+
+  if (userRole === "parent") {
+    // Parents can access forms for sessions they're registered in
+    if (!form.sessionId) return false;
+
+    const hasRegistration = await db.query.registrations.findFirst({
+      where: and(
+        eq(registrations.userId, userId),
+        eq(registrations.sessionId, form.sessionId)
+      ),
+    });
+    return !!hasRegistration;
+  }
+
+  if (userRole === "staff" || userRole === "nurse") {
+    // Staff can access forms for sessions they're assigned to
+    if (!form.sessionId) return false;
+
+    const hasAssignment = await db.query.assignments.findFirst({
+      where: and(
+        eq(assignments.staffId, userId),
+        eq(assignments.sessionId, form.sessionId)
+      ),
+    });
+    return !!hasAssignment;
+  }
+
+  return false;
+}
+
+// Check if user owns a form submission
+export async function ownsFormSubmission(
+  userId: string,
+  submissionId: string
+): Promise<boolean> {
+  const submission = await db.query.formSubmissions.findFirst({
+    where: and(
+      eq(formSubmissions.id, submissionId),
+      eq(formSubmissions.userId, userId)
+    ),
+  });
+  return !!submission;
 }

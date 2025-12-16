@@ -341,6 +341,146 @@ export const medicationLogs = pgTable("medication_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Form Builder tables
+
+export const formDefinitions = pgTable(
+  "form_definitions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    campId: uuid("camp_id")
+      .references(() => camps.id, { onDelete: "cascade" })
+      .notNull(),
+    sessionId: uuid("session_id").references(() => sessions.id, {
+      onDelete: "cascade",
+    }),
+    createdBy: text("created_by")
+      .references(() => user.id, { onDelete: "set null" })
+      .notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    formType: text("form_type").notNull(), // registration, waiver, medical, custom
+    status: text("status").notNull().default("draft"), // draft, active, archived
+    isPublished: boolean("is_published").notNull().default(false),
+    publishedAt: timestamp("published_at"),
+    version: integer("version").notNull().default(1),
+    aiActionId: uuid("ai_action_id").references(() => aiActions.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    campIdx: index("form_definitions_camp_idx").on(table.campId),
+    sessionIdx: index("form_definitions_session_idx").on(table.sessionId),
+    statusIdx: index("form_definitions_status_idx").on(table.status),
+  })
+);
+
+export const formFields = pgTable(
+  "form_fields",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    formDefinitionId: uuid("form_definition_id")
+      .references(() => formDefinitions.id, { onDelete: "cascade" })
+      .notNull(),
+    fieldKey: text("field_key").notNull(), // snake_case unique identifier
+    label: text("label").notNull(),
+    description: text("description"),
+    fieldType: text("field_type").notNull(), // text, email, select, radio, checkbox, etc.
+    validationRules: jsonb("validation_rules").$type<{
+      required?: boolean;
+      minLength?: number;
+      maxLength?: number;
+      min?: number;
+      max?: number;
+      pattern?: string;
+    }>(),
+    conditionalLogic: jsonb("conditional_logic").$type<{
+      showIf?: Array<{
+        fieldKey: string;
+        operator: "equals" | "notEquals" | "contains";
+        value: string | number | boolean | string[];
+      }>;
+    }>(),
+    displayOrder: integer("display_order").notNull(),
+    sectionName: text("section_name"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    formDefOrderIdx: index("form_fields_form_def_order_idx").on(
+      table.formDefinitionId,
+      table.displayOrder
+    ),
+    uniqueFieldKey: uniqueIndex("form_fields_unique_key").on(
+      table.formDefinitionId,
+      table.fieldKey
+    ),
+  })
+);
+
+export const formOptions: any = pgTable(
+  "form_options",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    formFieldId: uuid("form_field_id")
+      .references(() => formFields.id, { onDelete: "cascade" })
+      .notNull(),
+    parentOptionId: uuid("parent_option_id").references(() => formOptions.id, {
+      onDelete: "cascade",
+    }), // Self-reference for nesting
+    label: text("label").notNull(),
+    value: text("value").notNull(),
+    displayOrder: integer("display_order").notNull(),
+    triggersFields: jsonb("triggers_fields").$type<{ fieldKeys?: string[] }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    fieldOrderIdx: index("form_options_field_order_idx").on(
+      table.formFieldId,
+      table.displayOrder
+    ),
+    parentIdx: index("form_options_parent_idx").on(table.parentOptionId),
+  })
+);
+
+export const formSubmissions = pgTable(
+  "form_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    formDefinitionId: uuid("form_definition_id")
+      .references(() => formDefinitions.id, { onDelete: "restrict" })
+      .notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    childId: uuid("child_id").references(() => children.id, {
+      onDelete: "set null",
+    }),
+    registrationId: uuid("registration_id").references(() => registrations.id, {
+      onDelete: "set null",
+    }),
+    sessionId: uuid("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("submitted"), // draft, submitted, reviewed, approved
+    submissionData: jsonb("submission_data")
+      .notNull()
+      .$type<Record<string, unknown>>(),
+    submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    formDefIdx: index("form_submissions_form_def_idx").on(
+      table.formDefinitionId
+    ),
+    userIdx: index("form_submissions_user_idx").on(table.userId),
+    childIdx: index("form_submissions_child_idx").on(table.childId),
+    registrationIdx: index("form_submissions_registration_idx").on(
+      table.registrationId
+    ),
+    sessionIdx: index("form_submissions_session_idx").on(table.sessionId),
+    statusIdx: index("form_submissions_status_idx").on(table.status),
+  })
+);
+
 // Relations (for Drizzle ORM type-safe queries)
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -504,3 +644,78 @@ export const attendanceRelations = relations(attendance, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// Form Builder Relations
+
+export const formDefinitionsRelations = relations(
+  formDefinitions,
+  ({ one, many }) => ({
+    camp: one(camps, {
+      fields: [formDefinitions.campId],
+      references: [camps.id],
+    }),
+    session: one(sessions, {
+      fields: [formDefinitions.sessionId],
+      references: [sessions.id],
+    }),
+    creator: one(user, {
+      fields: [formDefinitions.createdBy],
+      references: [user.id],
+    }),
+    aiAction: one(aiActions, {
+      fields: [formDefinitions.aiActionId],
+      references: [aiActions.id],
+    }),
+    fields: many(formFields),
+    submissions: many(formSubmissions),
+  })
+);
+
+export const formFieldsRelations = relations(formFields, ({ one, many }) => ({
+  formDefinition: one(formDefinitions, {
+    fields: [formFields.formDefinitionId],
+    references: [formDefinitions.id],
+  }),
+  options: many(formOptions),
+}));
+
+export const formOptionsRelations: any = relations(formOptions, ({ one, many }) => ({
+  formField: one(formFields, {
+    fields: [formOptions.formFieldId],
+    references: [formFields.id],
+  }),
+  parentOption: one(formOptions, {
+    fields: [formOptions.parentOptionId],
+    references: [formOptions.id],
+    relationName: "childOptions",
+  }),
+  childOptions: many(formOptions, {
+    relationName: "childOptions",
+  }),
+}));
+
+export const formSubmissionsRelations = relations(
+  formSubmissions,
+  ({ one }) => ({
+    formDefinition: one(formDefinitions, {
+      fields: [formSubmissions.formDefinitionId],
+      references: [formDefinitions.id],
+    }),
+    user: one(user, {
+      fields: [formSubmissions.userId],
+      references: [user.id],
+    }),
+    child: one(children, {
+      fields: [formSubmissions.childId],
+      references: [children.id],
+    }),
+    registration: one(registrations, {
+      fields: [formSubmissions.registrationId],
+      references: [registrations.id],
+    }),
+    session: one(sessions, {
+      fields: [formSubmissions.sessionId],
+      references: [sessions.id],
+    }),
+  })
+);

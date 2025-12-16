@@ -13,7 +13,7 @@
     "db:push": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push",
     "db:studio": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit studio",
     "db:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push",
-    "db:reset": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit drop && drizzle-kit push",
+    "db:reset": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit drop && NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push",
     "db:seed": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/scripts/seed.ts"
   },
   "dependencies": {
