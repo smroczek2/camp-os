@@ -1,39 +1,50 @@
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { kv } from "@vercel/kv";
 
-// Initialize Redis client
-let redis: Redis | undefined;
+/**
+ * Vercel KV (Redis) Rate Limiting
+ *
+ * Setup:
+ * 1. Go to Vercel Dashboard → Your Project → Storage
+ * 2. Click "Create Database" → Select "KV"
+ * 3. Name it (e.g., "camp-os-redis")
+ * 4. Environment variables are auto-configured by Vercel
+ *
+ * No manual configuration needed! Vercel automatically adds:
+ * - KV_REST_API_URL
+ * - KV_REST_API_TOKEN
+ * - KV_REST_API_READ_ONLY_TOKEN
+ *
+ * For local development:
+ * Run `vercel env pull .env.local` to get environment variables
+ */
 
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
-}
+// Check if KV is configured (will be false in local dev without .env.local)
+const isKVConfigured = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
 // Rate limit configurations by endpoint type
 export const rateLimiters = {
-  aiChat: redis
+  aiChat: isKVConfigured
     ? new Ratelimit({
-        redis,
+        redis: kv,
         limiter: Ratelimit.slidingWindow(10, "1h"), // 10 requests per hour
         analytics: true,
         prefix: "ratelimit:ai-chat",
       })
     : null,
 
-  formGeneration: redis
+  formGeneration: isKVConfigured
     ? new Ratelimit({
-        redis,
+        redis: kv,
         limiter: Ratelimit.slidingWindow(20, "1d"), // 20 requests per day
         analytics: true,
         prefix: "ratelimit:form-generation",
       })
     : null,
 
-  formApproval: redis
+  formApproval: isKVConfigured
     ? new Ratelimit({
-        redis,
+        redis: kv,
         limiter: Ratelimit.slidingWindow(50, "1d"), // 50 requests per day
         analytics: true,
         prefix: "ratelimit:form-approval",
@@ -88,8 +99,8 @@ export function createRateLimitHeaders(result: RateLimitResult): Record<string, 
 
 /**
  * Check if rate limiting is enabled
- * @returns true if Redis is configured
+ * @returns true if Vercel KV is configured
  */
 export function isRateLimitingEnabled(): boolean {
-  return redis !== undefined;
+  return isKVConfigured;
 }
