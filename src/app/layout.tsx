@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agentic Coding Starterpack",
+  title: "Camp OS - Camp Management Platform",
   description:
-    "Complete agentic coding starterpack with authentication, database, AI integration, and modern tooling - perfect for building AI-powered applications and autonomous agents",
+    "Complete camp management solution for parents, staff, and administrators with real-time updates, medical tracking, and role-based access",
 };
 
 export default function RootLayout({

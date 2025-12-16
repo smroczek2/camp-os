@@ -1,0 +1,331 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth-helper";
+import { db } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { children, registrations } from "@/lib/schema";
+import { Badge } from "@/components/ui/badge";
+import { Users, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+
+export default async function ParentDashboard() {
+  const session = await getSession();
+
+  if (!session?.user) {
+    redirect("/dev-login");
+  }
+
+  // Get parent's children
+  const myChildren = await db.query.children.findMany({
+    where: eq(children.userId, session.user.id),
+  });
+
+  // Get all registrations for this parent
+  const myRegistrations = await db.query.registrations.findMany({
+    where: eq(registrations.userId, session.user.id),
+    with: {
+      child: true,
+      session: {
+        with: {
+          camp: true,
+        },
+      },
+    },
+  });
+
+  // Get all available sessions for browsing
+  const allSessions = await db.query.sessions.findMany({
+    with: {
+      camp: true,
+      registrations: true,
+    },
+  });
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Parent Dashboard</h1>
+        <p className="text-muted-foreground text-lg">
+          Welcome back, {session.user.name}
+        </p>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="p-6 border rounded-xl bg-card shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-500/10">
+              <Users className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{myChildren.length}</p>
+              <p className="text-sm text-muted-foreground">
+                {myChildren.length === 1 ? "Child" : "Children"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border rounded-xl bg-card shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-green-500/10">
+              <Calendar className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">
+                {
+                  myRegistrations.filter((r) => r.status === "confirmed")
+                    .length
+                }
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Active Registrations
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border rounded-xl bg-card shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-orange-500/10">
+              <AlertCircle className="h-6 w-6 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">
+                {myRegistrations.filter((r) => r.status === "pending").length}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Pending Payments
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* My Children */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">My Children</h2>
+          {/* TODO: Add "Add Child" button */}
+        </div>
+
+        {myChildren.length === 0 ? (
+          <div className="text-center p-12 border rounded-xl bg-muted/30">
+            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">No children added yet</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myChildren.map((child) => {
+              const childRegistrations = myRegistrations.filter(
+                (r) => r.childId === child.id
+              );
+              return (
+                <div
+                  key={child.id}
+                  className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">
+                        {child.firstName} {child.lastName}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Born{" "}
+                        {new Date(child.dateOfBirth).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/10">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </div>
+
+                  {child.allergies && child.allergies.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        Allergies
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {child.allergies.map((allergy, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {allergy}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      {childRegistrations.length} registration
+                      {childRegistrations.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Active Registrations */}
+      <div>
+        <h2 className="text-2xl font-bold mb-6">Registrations</h2>
+
+        {myRegistrations.length === 0 ? (
+          <div className="text-center p-12 border rounded-xl bg-muted/30">
+            <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground mb-4">
+              No camp registrations yet
+            </p>
+            {/* TODO: Add "Browse Sessions" button */}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {myRegistrations.map((registration) => (
+              <div
+                key={registration.id}
+                className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-semibold text-lg">
+                        {registration.session.camp.name}
+                      </h3>
+                      {registration.status === "confirmed" ? (
+                        <Badge className="bg-green-500">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Confirmed
+                        </Badge>
+                      ) : registration.status === "pending" ? (
+                        <Badge variant="outline" className="text-orange-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Pending Payment
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">{registration.status}</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {registration.child.firstName} {registration.child.lastName}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(
+                        registration.session.startDate
+                      ).toLocaleDateString()}{" "}
+                      -{" "}
+                      {new Date(
+                        registration.session.endDate
+                      ).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold">${registration.session.price}</p>
+                    {registration.amountPaid && (
+                      <p className="text-sm text-green-600">Paid</p>
+                    )}
+                  </div>
+                </div>
+
+                {registration.session.camp.location && (
+                  <p className="text-sm text-muted-foreground">
+                    📍 {registration.session.camp.location}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Browse Available Sessions */}
+      <div className="mt-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Browse Camp Sessions</h2>
+        </div>
+
+        {allSessions.length === 0 ? (
+          <div className="text-center p-12 border rounded-xl bg-muted/30">
+            <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">No sessions available</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {allSessions.map((session) => {
+              const spotsLeft =
+                session.capacity -
+                session.registrations.filter((r) => r.status === "confirmed")
+                  .length;
+              const isOpen = session.status === "open";
+
+              return (
+                <div
+                  key={session.id}
+                  className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-lg transition-all hover:-translate-y-1"
+                >
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-xl mb-2">
+                      {session.camp.name}
+                    </h3>
+                    {session.camp.description && (
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {session.camp.description}
+                      </p>
+                    )}
+                    {session.camp.location && (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        📍 {session.camp.location}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Dates</span>
+                      <span className="font-medium">
+                        {new Date(session.startDate).toLocaleDateString()} -{" "}
+                        {new Date(session.endDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Price</span>
+                      <span className="font-bold text-lg">${session.price}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Spots Left</span>
+                      <span
+                        className={`font-medium ${
+                          spotsLeft < 5 ? "text-orange-600" : "text-green-600"
+                        }`}
+                      >
+                        {spotsLeft} / {session.capacity}
+                      </span>
+                    </div>
+                  </div>
+
+                  {isOpen && spotsLeft > 0 ? (
+                    <Badge className="w-full justify-center bg-blue-500">
+                      Available
+                    </Badge>
+                  ) : !isOpen ? (
+                    <Badge variant="outline" className="w-full justify-center">
+                      {session.status}
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="w-full justify-center text-red-600"
+                    >
+                      Full
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
