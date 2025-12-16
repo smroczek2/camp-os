@@ -2,9 +2,16 @@
 
 This guide walks you through setting up Vercel KV (Redis) for rate limiting in Camp OS.
 
-## What is Vercel KV?
+## What is Vercel KV (Redis via Marketplace)?
 
-Vercel KV is a serverless Redis database service built on top of Upstash Redis. It's designed specifically for serverless and edge computing environments, making it perfect for Next.js applications deployed on Vercel.
+Vercel KV is a serverless Redis database service built on top of Upstash Redis. As of 2025, it's available through the **Vercel Marketplace as "Redis"** (powered by Upstash).
+
+**It's Real Redis, But Serverless:**
+- Same Redis data structures (strings, hashes, lists, sets, sorted sets)
+- Same Redis commands (SET, GET, INCR, EXPIRE, etc.)
+- HTTP REST API instead of TCP (works in serverless/edge)
+- No persistent connections needed
+- Auto-configured by Vercel
 
 **Key Features:**
 - Serverless Redis (no connection management needed)
@@ -17,22 +24,32 @@ Vercel KV is a serverless Redis database service built on top of Upstash Redis. 
 
 ## Production Setup (Vercel Dashboard)
 
-### Step 1: Create KV Database
+### Step 1: Create Redis Database via Marketplace
+
+**Updated for 2025 Vercel UI:**
 
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
 2. Select your project (camp-os)
 3. Click the **"Storage"** tab
-4. Click **"Create Database"**
-5. Select **"KV"** (Redis)
-6. Configure:
-   - **Name:** `camp-os-redis` (or any name you prefer)
-   - **Region:** Choose closest to your users (or primary region)
-7. Click **"Create"**
+4. Scroll to **"Marketplace Database Providers"**
+5. Click **"Upstash"** (or click **"Redis"** under Serverless DB)
+6. Click **"Create Redis Database"** (or "Add Integration" if first time)
+7. If first time with Upstash:
+   - Click **"Continue"** to connect Upstash account
+   - Vercel auto-creates and links your Upstash account
+   - Grant permissions
+8. Configure database:
+   - **Name:** `camp-os-redis`
+   - **Region:** Choose closest to your deployment (e.g., us-east-1)
+   - **Type:** Regional (recommended for lower cost) or Global (multi-region)
+9. Select projects to link:
+   - ✅ Check **camp-os**
+   - Click **"Add Integration"**
 
 **That's it!** Vercel automatically:
 - Provisions an Upstash Redis instance
-- Adds environment variables to your project
-- Configures them for all deployments
+- Adds environment variables to your project (`KV_REST_API_URL`, `KV_REST_API_TOKEN`)
+- Configures them for all deployments (production + previews)
 
 ### Step 2: Deploy Your App
 
