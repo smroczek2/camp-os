@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Users,
   Calendar,
@@ -9,7 +10,9 @@ import {
   Shield,
   Activity,
   AlertCircle,
+  FileText,
 } from "lucide-react";
+import Link from "next/link";
 
 export default async function AdminDashboard() {
   const session = await getSession();
@@ -68,10 +71,20 @@ export default async function AdminDashboard() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
-        <p className="text-muted-foreground text-lg">
-          Welcome, {session.user.name}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
+            <p className="text-muted-foreground text-lg">
+              Welcome, {session.user.name}
+            </p>
+          </div>
+          <Link href="/dashboard/admin/forms">
+            <Button>
+              <FileText className="h-4 w-4 mr-2" />
+              Form Builder
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Quick Stats */}

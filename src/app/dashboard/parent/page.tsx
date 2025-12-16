@@ -1,10 +1,17 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { children, registrations } from "@/lib/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import {
+  children,
+  registrations,
+  formDefinitions,
+  formSubmissions,
+} from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
-import { Users, Calendar, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Calendar, AlertCircle, CheckCircle2, FileText, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 export default async function ParentDashboard() {
   const session = await getSession();
@@ -37,6 +44,34 @@ export default async function ParentDashboard() {
       camp: true,
       registrations: true,
     },
+  });
+
+  // Get session IDs for registered sessions
+  const registeredSessionIds = myRegistrations.map((r) => r.sessionId);
+
+  // Get published forms for registered sessions
+  const availableForms =
+    registeredSessionIds.length > 0
+      ? await db.query.formDefinitions.findMany({
+          where: and(
+            eq(formDefinitions.isPublished, true),
+            inArray(formDefinitions.sessionId, registeredSessionIds)
+          ),
+          with: {
+            fields: { columns: { id: true } },
+            session: {
+              with: {
+                camp: { columns: { name: true } },
+              },
+            },
+          },
+        })
+      : [];
+
+  // Get user's form submissions to check what's already completed
+  const mySubmissions = await db.query.formSubmissions.findMany({
+    where: eq(formSubmissions.userId, session.user.id),
+    columns: { formDefinitionId: true },
   });
 
   return (
@@ -100,6 +135,79 @@ export default async function ParentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Forms to Complete */}
+      {availableForms.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <FileText className="h-6 w-6" />
+              Forms to Complete
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {availableForms.map((form) => {
+              const isCompleted = mySubmissions.some(
+                (s) => s.formDefinitionId === form.id
+              );
+
+              return (
+                <div
+                  key={form.id}
+                  className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-lg">{form.name}</h3>
+                        {isCompleted ? (
+                          <Badge className="bg-green-500">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-orange-600">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Action Required
+                          </Badge>
+                        )}
+                      </div>
+                      {form.description && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {form.description}
+                        </p>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {form.fields?.length || 0} fields •{" "}
+                        {(form.session as any)?.camp?.name || "Camp-wide"}
+                      </p>
+                    </div>
+                    <div>
+                      {!isCompleted && (
+                        <Link href={`/dashboard/parent/forms/${form.id}`}>
+                          <Button>
+                            Complete Form
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </Link>
+                      )}
+                      {isCompleted && (
+                        <Link href={`/dashboard/parent/forms/${form.id}`}>
+                          <Button variant="outline">
+                            View Submission
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* My Children */}
       <div className="mb-8">
