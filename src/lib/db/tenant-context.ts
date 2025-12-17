@@ -2,14 +2,16 @@ import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
+import * as schema from "@/lib/schema";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
 
 /**
  * Type for the transaction object passed to callbacks
  */
 export type TenantTransaction = PgTransaction<
   PostgresJsQueryResultHKT,
-  any,
-  any
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
 >;
 
 /**

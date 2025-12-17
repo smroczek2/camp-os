@@ -35,11 +35,18 @@ export async function submitFormAction(data: {
     throw new Error("Unauthorized");
   }
 
+  if (!session.user.activeOrganizationId) {
+    throw new Error("No active organization. Please select an organization.");
+  }
+
   // Check permission
   await enforcePermission(session.user.id, "formSubmission", "create");
 
   // Check form access
-  const canAccess = await canAccessForm(session.user.id, data.formDefinitionId);
+  const canAccess = await canAccessForm(
+    session.user.id,
+    data.formDefinitionId
+  );
   if (!canAccess) {
     throw new ForbiddenError("Cannot access this form");
   }
@@ -74,10 +81,13 @@ export async function submitFormAction(data: {
     }
   }
 
-  return formService.submitForm({
-    ...data,
-    userId: session.user.id,
-  });
+  return formService.submitForm(
+    {
+      ...data,
+      userId: session.user.id,
+    },
+    session.user.activeOrganizationId
+  );
 }
 
 /**
@@ -169,9 +179,14 @@ export async function generateFormAction(data: {
     );
   }
 
+  if (!session.user.activeOrganizationId) {
+    throw new Error("No active organization. Please select an organization.");
+  }
+
   // Permission check happens inside createFormGenerationAction
   const result = await createFormGenerationAction(
     session.user.id,
+    session.user.activeOrganizationId,
     data.prompt,
     data.campId,
     data.sessionId
