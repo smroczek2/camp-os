@@ -15,6 +15,10 @@ import { eq, and } from "drizzle-orm";
  * 2. Look up organization by slug
  * 3. Verify user has access to organization (if authenticated)
  * 4. Inject x-organization-id header for downstream use
+ *
+ * Bug #2 Fix: Preview mode read-only enforcement
+ * When a super admin is in preview mode (preview_org_id cookie set),
+ * non-GET requests are blocked to enforce read-only access.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -22,6 +26,20 @@ export async function middleware(request: NextRequest) {
   // Skip middleware for public routes
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
+  }
+
+  // Bug #2 Fix: Enforce read-only mode for super admin preview
+  const previewOrgId = request.cookies.get("preview_org_id")?.value;
+  if (previewOrgId && request.method !== "GET") {
+    // Block non-GET requests during preview mode
+    // This prevents super admins from accidentally modifying client data
+    return NextResponse.json(
+      {
+        error: "Preview mode is read-only",
+        message: "You cannot modify data while in preview mode. Exit preview mode to make changes.",
+      },
+      { status: 403 }
+    );
   }
 
   // Extract organization slug from path: /org/{slug}/...
@@ -108,6 +126,7 @@ function isPublicRoute(pathname: string): boolean {
     "/api/diagnostics", // System health checks
     "/dev-login", // Development login
     "/favicon.ico",
+    "/super-admin", // Super admin portal (has own auth guard)
   ];
 
   return publicPaths.some((path) => pathname.startsWith(path));
