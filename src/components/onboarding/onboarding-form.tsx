@@ -124,43 +124,67 @@ export function OnboardingForm() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                step >= 1 ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
+              className={`flex items-center justify-center w-8 h-8 rounded-full font-medium ${
+                step >= 1
+                  ? "bg-blue-600 text-white"
+                  : "border-2 border-gray-400 text-gray-600 dark:border-gray-500 dark:text-gray-300"
               }`}
             >
               {step > 1 ? <CheckCircle className="h-5 w-5" /> : "1"}
             </div>
-            <span className={step >= 1 ? "font-medium" : "text-muted-foreground"}>
+            <span
+              className={
+                step >= 1
+                  ? "font-medium text-gray-900 dark:text-white"
+                  : "text-gray-600 dark:text-gray-400"
+              }
+            >
               Organization
             </span>
           </div>
 
-          <div className="flex-1 h-0.5 bg-muted mx-4" />
+          <div className="flex-1 h-0.5 bg-gray-300 dark:bg-gray-600 mx-4" />
 
           <div className="flex items-center gap-2">
             <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                step >= 2 ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
+              className={`flex items-center justify-center w-8 h-8 rounded-full font-medium ${
+                step >= 2
+                  ? "bg-blue-600 text-white"
+                  : "border-2 border-gray-400 text-gray-600 dark:border-gray-500 dark:text-gray-300"
               }`}
             >
               {step > 2 ? <CheckCircle className="h-5 w-5" /> : "2"}
             </div>
-            <span className={step >= 2 ? "font-medium" : "text-muted-foreground"}>
+            <span
+              className={
+                step >= 2
+                  ? "font-medium text-gray-900 dark:text-white"
+                  : "text-gray-600 dark:text-gray-400"
+              }
+            >
               Admin Account
             </span>
           </div>
 
-          <div className="flex-1 h-0.5 bg-muted mx-4" />
+          <div className="flex-1 h-0.5 bg-gray-300 dark:bg-gray-600 mx-4" />
 
           <div className="flex items-center gap-2">
             <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                step >= 3 ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
+              className={`flex items-center justify-center w-8 h-8 rounded-full font-medium ${
+                step >= 3
+                  ? "bg-blue-600 text-white"
+                  : "border-2 border-gray-400 text-gray-600 dark:border-gray-500 dark:text-gray-300"
               }`}
             >
               3
             </div>
-            <span className={step >= 3 ? "font-medium" : "text-muted-foreground"}>
+            <span
+              className={
+                step >= 3
+                  ? "font-medium text-gray-900 dark:text-white"
+                  : "text-gray-600 dark:text-gray-400"
+              }
+            >
               Review
             </span>
           </div>
