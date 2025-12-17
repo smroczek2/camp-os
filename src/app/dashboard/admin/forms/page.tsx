@@ -12,7 +12,7 @@ import Link from "next/link";
 export default async function FormsPage() {
   const session = await getSession();
   if (!session?.user) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   // Check admin role

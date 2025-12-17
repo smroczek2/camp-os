@@ -10,11 +10,11 @@ export default async function StaffDashboard() {
   const session = await getSession();
 
   if (!session?.user) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   if (!session.user.activeOrganizationId) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   const myAssignments = await withOrganizationContext(

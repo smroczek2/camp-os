@@ -1,23 +1,10 @@
 import { auth } from "@/lib/auth";
-import { getDevUser, isDevMode } from "@/lib/dev-auth";
 import { headers } from "next/headers";
 
 /**
- * Unified authentication helper that supports both Better Auth and dev mode
- *
- * In development: checks for dev user cookie first, falls back to Better Auth
- * In production: only uses Better Auth
+ * Get the current session from Better Auth
  */
 export async function getSession() {
-  // In dev mode, check for dev user first
-  if (isDevMode()) {
-    const devUser = await getDevUser();
-    if (devUser) {
-      return devUser;
-    }
-  }
-
-  // Fall back to Better Auth
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -40,4 +27,23 @@ export async function getUserWithRole() {
   }
 
   return session.user;
+}
+
+/**
+ * Check if user has super_admin role
+ */
+export async function isSuperAdmin() {
+  const user = await getUserWithRole();
+  return user?.role === "super_admin";
+}
+
+/**
+ * Require authentication - throws redirect if not authenticated
+ */
+export async function requireAuth() {
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+  return session;
 }

@@ -2,6 +2,16 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 
+/**
+ * Check if an email domain should get super_admin role
+ * Camp OS employees (campminder.com) are automatically super admins
+ */
+function isSuperAdminEmail(email: string): boolean {
+  const superAdminDomains = ["campminder.com"];
+  const domain = email.split("@")[1]?.toLowerCase();
+  return superAdminDomains.includes(domain);
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -27,9 +37,23 @@ export const auth = betterAuth({
       },
     },
   },
-  session: {
-    // Extend session with organization context
-    // Note: Better Auth automatically includes user fields in session
-    // Additional custom session fields can be added here if needed
+  // Hooks to customize user creation
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          // Auto-assign super_admin role to campminder.com emails
+          if (user.email && isSuperAdminEmail(user.email)) {
+            return {
+              data: {
+                ...user,
+                role: "super_admin",
+              },
+            };
+          }
+          return { data: user };
+        },
+      },
+    },
   },
 });

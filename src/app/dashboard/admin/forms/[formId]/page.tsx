@@ -15,7 +15,7 @@ export default async function FormDetailsPage({
   const { formId } = await params;
   const session = await getSession();
   if (!session?.user) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   // Check admin role

@@ -8,11 +8,11 @@ export default async function NurseDashboard() {
   const session = await getSession();
 
   if (!session?.user) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   if (!session.user.activeOrganizationId) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   const { allChildren, recentLogs, recentIncidents } =

@@ -8,7 +8,7 @@ export default async function DashboardPage() {
   const session = await getSession();
 
   if (!session?.user) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   // Get user role
@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   });
 
   if (!userRecord) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   // Route to role-specific dashboard

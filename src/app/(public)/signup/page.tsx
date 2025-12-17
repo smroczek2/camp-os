@@ -27,7 +27,7 @@ export default function SignupPage() {
       <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
         <p>
           Already have an account?{" "}
-          <Link href="/dev-login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-blue-600 hover:underline">
             Log in here
           </Link>
         </p>

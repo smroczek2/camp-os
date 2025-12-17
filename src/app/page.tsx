@@ -53,7 +53,7 @@ export default async function Home() {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="text-lg px-8">
-                <Link href="/dev-login">
+                <Link href="/login">
                   Sign In
                 </Link>
               </Button>
@@ -248,7 +248,7 @@ export default async function Home() {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="text-lg px-8">
-                <Link href="/dev-login">
+                <Link href="/login">
                   Sign In
                 </Link>
               </Button>

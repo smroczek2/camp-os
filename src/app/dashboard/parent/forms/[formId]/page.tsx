@@ -22,7 +22,7 @@ export default async function ParentFormPage({
   const { formId } = await params;
   const { childId } = await searchParams;
   const session = await getSession();
-  if (!session?.user) redirect("/dev-login");
+  if (!session?.user) redirect("/login");
 
   let formConfig: Awaited<ReturnType<typeof getFormAction>> | null = null;
   try {

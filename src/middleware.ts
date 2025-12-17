@@ -124,7 +124,7 @@ function isPublicRoute(pathname: string): boolean {
     "/api/auth", // Better Auth endpoints
     "/api/onboarding", // Organization signup
     "/api/diagnostics", // System health checks
-    "/dev-login", // Development login
+    "/login", // Sign in page
     "/favicon.ico",
     "/super-admin", // Super admin portal (has own auth guard)
   ];

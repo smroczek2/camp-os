@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { UserProfile } from "@/components/auth/user-profile";
 import { ModeToggle } from "./ui/mode-toggle";
-import { RoleSwitcher } from "@/components/role-switcher";
 import { Tent } from "lucide-react";
 
 export function SiteHeader() {
@@ -22,7 +21,6 @@ export function SiteHeader() {
           </Link>
         </h1>
         <div className="flex items-center gap-4">
-          <RoleSwitcher />
           <UserProfile />
           <ModeToggle />
         </div>

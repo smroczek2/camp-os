@@ -17,7 +17,7 @@ export default async function FormSuccessPage({
   const session = await getSession();
 
   if (!session?.user) {
-    redirect("/dev-login");
+    redirect("/login");
   }
 
   let formName = "Form";
