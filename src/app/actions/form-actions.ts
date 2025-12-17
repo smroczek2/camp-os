@@ -14,7 +14,7 @@ import { ForbiddenError } from "@/lib/rbac";
 import { db } from "@/lib/db";
 import { aiActions, events, children, registrations } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
-import { rateLimiters, checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type {
   GeneratedFormResult,
   AIFormGeneration,
@@ -158,7 +158,7 @@ export async function generateFormAction(data: {
 
   // Rate limiting for AI form generation
   const rateLimitResult = await checkRateLimit(
-    rateLimiters.formGeneration,
+    "formGeneration",
     session.user.id
   );
 
@@ -220,7 +220,7 @@ export async function approveAIFormAction(data: {
 
   // Rate limiting for AI form approval
   const rateLimitResult = await checkRateLimit(
-    rateLimiters.formApproval,
+    "formApproval",
     session.user.id
   );
 

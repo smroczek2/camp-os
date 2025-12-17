@@ -3,7 +3,7 @@ import { streamText } from "ai";
 import { getSession } from "@/lib/auth-helper";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { rateLimiters, checkRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
+import { checkRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
 
 // Input validation schema
 const chatRequestSchema = z.object({
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     // 2. Rate limiting
     const rateLimitResult = await checkRateLimit(
-      rateLimiters.aiChat,
+      "aiChat",
       session.user.id
     );
 
