@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth-helper";
-import { db } from "@/lib/db";
+import { withOrganizationContext } from "@/lib/db/tenant-context";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -9,18 +9,32 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!session.user.activeOrganizationId) {
+    return NextResponse.json(
+      { error: "No active organization" },
+      { status: 400 }
+    );
+  }
+
   try {
-    const camps = await db.query.camps.findMany({
-      columns: { id: true, name: true },
-    });
+    const result = await withOrganizationContext(
+      session.user.activeOrganizationId,
+      async (tx) => {
+        const camps = await tx.query.camps.findMany({
+          columns: { id: true, name: true },
+        });
 
-    const sessions = await db.query.sessions.findMany({
-      columns: { id: true, campId: true, startDate: true },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      orderBy: (sessions: any, { desc }: any) => [desc(sessions.startDate)],
-    });
+        const sessions = await tx.query.sessions.findMany({
+          columns: { id: true, campId: true, startDate: true },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          orderBy: (sessions: any, { desc }: any) => [desc(sessions.startDate)],
+        });
 
-    return NextResponse.json({ camps, sessions });
+        return { camps, sessions };
+      }
+    );
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching camps:", error);
     return NextResponse.json(

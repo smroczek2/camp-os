@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { db } from "@/lib/db";
+import { withOrganizationContext } from "@/lib/db/tenant-context";
 import { eq, and, inArray } from "drizzle-orm";
 import {
   children,
@@ -23,59 +23,82 @@ export default async function ParentDashboard() {
     redirect("/dev-login");
   }
 
-  // Get parent's children
-  const myChildren = await db.query.children.findMany({
-    where: eq(children.userId, session.user.id),
-  });
+  if (!session.user.activeOrganizationId) {
+    redirect("/dev-login");
+  }
 
-  // Get all registrations for this parent
-  const myRegistrations = await db.query.registrations.findMany({
-    where: eq(registrations.userId, session.user.id),
-    with: {
-      child: true,
-      session: {
+  const {
+    myChildren,
+    myRegistrations,
+    allSessions,
+    availableForms,
+    mySubmissions,
+  } = await withOrganizationContext(
+    session.user.activeOrganizationId,
+    async (tx) => {
+      // Get parent's children
+      const myChildren = await tx.query.children.findMany({
+        where: eq(children.userId, session.user.id),
+      });
+
+      // Get all registrations for this parent
+      const myRegistrations = await tx.query.registrations.findMany({
+        where: eq(registrations.userId, session.user.id),
         with: {
-          camp: true,
-        },
-      },
-    },
-  });
-
-  // Get all available sessions for browsing
-  const allSessions = await db.query.sessions.findMany({
-    with: {
-      camp: true,
-      registrations: true,
-    },
-  });
-
-  // Get session IDs for registered sessions
-  const registeredSessionIds = myRegistrations.map((r) => r.sessionId);
-
-  // Get published forms for registered sessions
-  const availableForms =
-    registeredSessionIds.length > 0
-      ? await db.query.formDefinitions.findMany({
-          where: and(
-            eq(formDefinitions.isPublished, true),
-            inArray(formDefinitions.sessionId, registeredSessionIds)
-          ),
-          with: {
-            fields: { columns: { id: true } },
-            session: {
-              with: {
-                camp: { columns: { name: true } },
-              },
+          child: true,
+          session: {
+            with: {
+              camp: true,
             },
           },
-        })
-      : [];
+        },
+      });
 
-  // Get user's form submissions to check what's already completed
-  const mySubmissions = await db.query.formSubmissions.findMany({
-    where: eq(formSubmissions.userId, session.user.id),
-    columns: { formDefinitionId: true },
-  });
+      // Get all available sessions for browsing
+      const allSessions = await tx.query.sessions.findMany({
+        with: {
+          camp: true,
+          registrations: true,
+        },
+      });
+
+      // Get session IDs for registered sessions
+      const registeredSessionIds = myRegistrations.map((r) => r.sessionId);
+
+      // Get published forms for registered sessions
+      const availableForms =
+        registeredSessionIds.length > 0
+          ? await tx.query.formDefinitions.findMany({
+              where: and(
+                eq(formDefinitions.isPublished, true),
+                inArray(formDefinitions.sessionId, registeredSessionIds)
+              ),
+              with: {
+                fields: { columns: { id: true } },
+                session: {
+                  with: {
+                    camp: { columns: { name: true } },
+                  },
+                },
+              },
+            })
+          : [];
+
+      // Get user's form submissions to check what's already completed
+      const mySubmissions = await tx.query.formSubmissions.findMany({
+        where: eq(formSubmissions.userId, session.user.id),
+        columns: { formDefinitionId: true },
+      });
+
+      return {
+        myChildren,
+        myRegistrations,
+        allSessions,
+        availableForms,
+        mySubmissions,
+      };
+    }
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -428,7 +451,7 @@ export default async function ParentDashboard() {
                     <div className="mt-4">
                       <RegisterSessionDialog
                         session={session}
-                        children={myChildren}
+                        childrenList={myChildren}
                         disabled={myChildren.length === 0}
                       />
                     </div>

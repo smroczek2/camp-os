@@ -38,13 +38,13 @@ type SessionWithCamp = {
 
 interface RegisterSessionDialogProps {
   session: SessionWithCamp;
-  children: Child[];
+  childrenList: Child[];
   disabled?: boolean;
 }
 
 export function RegisterSessionDialog({
   session,
-  children,
+  childrenList,
   disabled = false,
 }: RegisterSessionDialogProps) {
   const [open, setOpen] = useState(false);
@@ -80,7 +80,7 @@ export function RegisterSessionDialog({
     }
   }
 
-  if (children.length === 0) {
+  if (childrenList.length === 0) {
     return (
       <Button disabled variant="outline" className="w-full">
         <Calendar className="h-4 w-4 mr-2" />
@@ -102,7 +102,7 @@ export function RegisterSessionDialog({
           <DialogHeader>
             <DialogTitle>Register for {session.camp.name}</DialogTitle>
             <DialogDescription>
-              Select which child you'd like to register for this session.
+              Select which child you&apos;d like to register for this session.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -117,7 +117,7 @@ export function RegisterSessionDialog({
                   <SelectValue placeholder="Choose a child..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {children.map((child) => (
+                  {childrenList.map((child) => (
                     <SelectItem key={child.id} value={child.id}>
                       {child.firstName} {child.lastName}
                     </SelectItem>

@@ -85,10 +85,9 @@ export async function withOrganizationContext<T>(
  * }
  * ```
  */
-export function getOrganizationFromHeaders(): string {
-  // Dynamic import to avoid issues in non-Next.js contexts
-  const { headers } = require("next/headers");
-  const headersList = headers();
+export async function getOrganizationFromHeaders(): Promise<string> {
+  const { headers } = await import("next/headers");
+  const headersList = await headers();
   const organizationId = headersList.get("x-organization-id");
 
   if (!organizationId) {

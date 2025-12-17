@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { db } from "@/lib/db";
+import { withOrganizationContext } from "@/lib/db/tenant-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,33 +21,44 @@ export default async function AdminDashboard() {
     redirect("/dev-login");
   }
 
-  // Get all camps and sessions
-  const allCamps = await db.query.camps.findMany({
-    with: {
-      sessions: {
+  if (!session.user.activeOrganizationId) {
+    redirect("/dev-login");
+  }
+
+  const { allCamps, allRegistrations } = await withOrganizationContext(
+    session.user.activeOrganizationId,
+    async (tx) => {
+      // Get all camps and sessions
+      const allCamps = await tx.query.camps.findMany({
         with: {
-          registrations: {
+          sessions: {
             with: {
-              child: true,
-              user: true,
+              registrations: {
+                with: {
+                  child: true,
+                  user: true,
+                },
+              },
             },
           },
         },
-      },
-    },
-  });
+      });
 
-  // Get all registrations
-  const allRegistrations = await db.query.registrations.findMany({
-    with: {
-      child: true,
-      session: {
+      // Get all registrations
+      const allRegistrations = await tx.query.registrations.findMany({
         with: {
-          camp: true,
+          child: true,
+          session: {
+            with: {
+              camp: true,
+            },
+          },
         },
-      },
-    },
-  });
+      });
+
+      return { allCamps, allRegistrations };
+    }
+  );
 
   // Calculate stats
   const totalRevenue = allRegistrations

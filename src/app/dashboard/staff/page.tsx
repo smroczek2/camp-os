@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { db } from "@/lib/db";
+import { withOrganizationContext } from "@/lib/db/tenant-context";
 import { eq } from "drizzle-orm";
 import { assignments } from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
@@ -13,26 +13,35 @@ export default async function StaffDashboard() {
     redirect("/dev-login");
   }
 
-  // Get staff assignments
-  const myAssignments = await db.query.assignments.findMany({
-    where: eq(assignments.staffId, session.user.id),
-    with: {
-      group: {
+  if (!session.user.activeOrganizationId) {
+    redirect("/dev-login");
+  }
+
+  const myAssignments = await withOrganizationContext(
+    session.user.activeOrganizationId,
+    async (tx) => {
+      // Get staff assignments
+      return tx.query.assignments.findMany({
+        where: eq(assignments.staffId, session.user.id),
         with: {
-          members: {
+          group: {
             with: {
-              child: true,
+              members: {
+                with: {
+                  child: true,
+                },
+              },
+            },
+          },
+          session: {
+            with: {
+              camp: true,
             },
           },
         },
-      },
-      session: {
-        with: {
-          camp: true,
-        },
-      },
-    },
-  });
+      });
+    }
+  );
 
   const totalChildren = myAssignments.reduce(
     (sum, assignment) => sum + assignment.group.members.length,
