@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Building2, Users, Activity, LogOut, Shield } from "lucide-react";
+import { Building2, Users, Activity, LogOut, Tent } from "lucide-react";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
@@ -63,11 +63,18 @@ export function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
             href="/super-admin"
             className="flex items-center gap-2 font-bold text-lg"
           >
-            <Shield className="h-6 w-6 text-purple-600" />
-            <span>Camp OS Admin</span>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/10 to-green-500/10 border border-blue-500/20">
+              <Tent className="h-5 w-5 text-blue-600" />
+            </div>
+            <span className="bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+              Camp OS
+            </span>
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              Admin
+            </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-6">
             {navItems.map((item) => {
               const isActive =
                 pathname === item.href ||
@@ -79,10 +86,10 @@ export function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center gap-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-100"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
