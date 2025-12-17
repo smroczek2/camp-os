@@ -48,8 +48,13 @@ export default async function Home() {
           ) : (
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button asChild size="lg" className="text-lg px-8">
+                <Link href="/signup">
+                  Start Free <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="text-lg px-8">
                 <Link href="/dev-login">
-                  Dev Login
+                  Sign In
                 </Link>
               </Button>
             </div>
@@ -234,13 +239,20 @@ export default async function Home() {
               Ready to Get Started?
             </h2>
             <p className="text-muted-foreground text-lg mb-8">
-              Sign in to access your dashboard
+              Create your camp organization in minutes. No credit card required.
             </p>
-            <Button asChild size="lg" className="text-lg px-8">
-              <Link href="/dev-login">
-                Dev Login
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Button asChild size="lg" className="text-lg px-8">
+                <Link href="/signup">
+                  Create Your Camp <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="text-lg px-8">
+                <Link href="/dev-login">
+                  Sign In
+                </Link>
+              </Button>
+            </div>
           </div>
         </section>
       )}
