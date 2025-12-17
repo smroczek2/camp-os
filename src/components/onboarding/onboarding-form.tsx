@@ -30,9 +30,13 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { onboardingSchema, type OnboardingInput } from "@/types/onboarding";
-import { generateOrganizationSlug } from "@/lib/provisioning/provision-organization";
-import type { OnboardingResult, OnboardingError } from "@/types/onboarding";
+import {
+  onboardingSchema,
+  generateSlug,
+  type OnboardingInput,
+  type OnboardingResult,
+  type OnboardingError,
+} from "@/types/onboarding";
 
 const TIMEZONES = [
   "America/New_York",
@@ -76,8 +80,8 @@ export function OnboardingForm() {
     setValue("organizationName", name);
 
     // Auto-generate slug if user hasn't manually edited it
-    if (!organizationSlug || organizationSlug === generateOrganizationSlug(organizationName || "")) {
-      setValue("organizationSlug", generateOrganizationSlug(name));
+    if (!organizationSlug || organizationSlug === generateSlug(organizationName || "")) {
+      setValue("organizationSlug", generateSlug(name));
     }
   };
 

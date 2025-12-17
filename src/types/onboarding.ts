@@ -75,6 +75,7 @@ export interface OnboardingError {
 
 /**
  * Helper to generate slug from organization name
+ * Safe for client-side use
  */
 export function generateSlug(name: string): string {
   return name
@@ -84,19 +85,4 @@ export function generateSlug(name: string): string {
     .replace(/\s+/g, "-") // Replace spaces with hyphens
     .replace(/-+/g, "-") // Replace multiple hyphens with single
     .replace(/^-+|-+$/g, ""); // Trim hyphens from start/end
-}
-
-/**
- * Validate slug uniqueness
- */
-export async function isSlugAvailable(slug: string): Promise<boolean> {
-  const { db } = await import("@/lib/db");
-  const { eq } = await import("drizzle-orm");
-  const { organizations } = await import("@/lib/schema");
-
-  const existing = await db.query.organizations.findFirst({
-    where: eq(organizations.slug, slug),
-  });
-
-  return !existing;
 }
