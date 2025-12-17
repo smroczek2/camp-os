@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { organizations, organizationUsers, user, events } from "@/lib/schema";
-import { eq, sql, desc, count } from "drizzle-orm";
+import { eq, sql, desc, count, gte } from "drizzle-orm";
 import { getSession } from "@/lib/auth-helper";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -110,7 +110,7 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
   const [{ recentOnboardings }] = await db
     .select({ recentOnboardings: count() })
     .from(organizations)
-    .where(sql`${organizations.createdAt} >= ${sevenDaysAgo}`);
+    .where(gte(organizations.createdAt, sevenDaysAgo));
 
   return {
     totalOrganizations:
