@@ -55,8 +55,9 @@ export async function withOrganizationContext<T>(
   return db.transaction(async (tx) => {
     // Set PostgreSQL session variable for RLS within transaction scope
     // This variable is used by RLS policies to filter rows
+    // Note: Using sql.raw() because SET LOCAL doesn't support parameterized queries
     await tx.execute(
-      sql`SET LOCAL app.current_organization_id = ${organizationId}`
+      sql.raw(`SET LOCAL app.current_organization_id = '${organizationId}'`)
     );
 
     // Execute callback with transaction object (must use tx, not db)
