@@ -21,6 +21,7 @@ export const user = pgTable("user", {
   emailVerified: boolean("emailVerified"),
   image: text("image"),
   role: text("role").notNull().default("parent"), // parent, staff, admin, nurse, super_admin
+  activeOrganizationId: text("active_organization_id"), // Current organization context for the user
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
