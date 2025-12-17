@@ -177,6 +177,7 @@ export function buildFormPreview(generatedForm: AIFormGeneration) {
  */
 export async function createFormGenerationAction(
   userId: string,
+  organizationId: string,
   prompt: string,
   campId: string,
   sessionId?: string
@@ -195,6 +196,7 @@ export async function createFormGenerationAction(
     const [aiAction] = await tx
       .insert(aiActions)
       .values({
+        organizationId,
         userId,
         action: "createForm",
         params: {
@@ -209,6 +211,7 @@ export async function createFormGenerationAction(
       .returning();
 
     await tx.insert(events).values({
+      organizationId,
       streamId: `ai-action-${aiAction.id}`,
       eventType: "AIFormGenerationRequested",
       eventData: {

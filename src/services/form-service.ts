@@ -65,6 +65,7 @@ export class FormService {
     }
 
     await tx.insert(formSnapshots).values({
+      organizationId: completeForm.organizationId,
       formDefinitionId: formId,
       version,
       snapshot: completeForm as unknown as Record<string, unknown>,
@@ -95,14 +96,17 @@ export class FormService {
   /**
    * Submit form response with dynamic validation
    */
-  async submitForm(data: {
-    formDefinitionId: string;
-    userId?: string;
-    childId?: string;
-    registrationId?: string;
-    sessionId?: string;
-    submissionData: Record<string, unknown>;
-  }) {
+  async submitForm(
+    data: {
+      formDefinitionId: string;
+      userId?: string;
+      childId?: string;
+      registrationId?: string;
+      sessionId?: string;
+      submissionData: Record<string, unknown>;
+    },
+    organizationId: string
+  ) {
     const formDef = await this.getFormComplete(data.formDefinitionId);
     if (!formDef) {
       throw new Error("Form definition not found");
@@ -153,6 +157,7 @@ export class FormService {
       const [submission] = await tx
         .insert(formSubmissions)
         .values({
+          organizationId,
           formDefinitionId: data.formDefinitionId,
           userId: data.userId,
           childId: data.childId,
@@ -166,6 +171,7 @@ export class FormService {
 
       // Log event for audit trail
       await tx.insert(events).values({
+        organizationId,
         streamId: `submission-${submission.id}`,
         eventType: "FormSubmitted",
         eventData: {
@@ -244,11 +250,14 @@ export class FormService {
       generatedForm: AIFormGeneration;
     };
 
+    const organizationId = aiAction.organizationId;
+
     return db.transaction(async (tx) => {
       // Create form definition
       const [form] = await tx
         .insert(formDefinitions)
         .values({
+          organizationId,
           campId: params.campId,
           sessionId: params.sessionId,
           name: params.generatedForm.formDefinition.name,
@@ -265,6 +274,7 @@ export class FormService {
         const [createdField] = await tx
           .insert(formFields)
           .values({
+            organizationId,
             formDefinitionId: form.id,
             fieldKey: field.fieldKey,
             label: field.label,
@@ -281,6 +291,7 @@ export class FormService {
         if (field.options) {
           for (const option of field.options) {
             await tx.insert(formOptions).values({
+              organizationId,
               formFieldId: createdField.id,
               label: option.label,
               value: option.value,
@@ -303,6 +314,7 @@ export class FormService {
       // Log events
       await tx.insert(events).values([
         {
+          organizationId,
           streamId: `form-${form.id}`,
           eventType: "FormCreatedByAI",
           eventData: { formId: form.id, aiActionId },
@@ -310,6 +322,7 @@ export class FormService {
           userId: approvedBy,
         },
         {
+          organizationId,
           streamId: `ai-action-${aiActionId}`,
           eventType: "AIActionExecuted",
           eventData: { aiActionId, formId: form.id },
@@ -353,7 +366,7 @@ export class FormService {
     return db.transaction(async (tx) => {
       const existingForm = await tx.query.formDefinitions.findFirst({
         where: eq(formDefinitions.id, formId),
-        columns: { id: true, version: true },
+        columns: { id: true, version: true, organizationId: true },
       });
 
       if (!existingForm) {
@@ -361,6 +374,7 @@ export class FormService {
       }
 
       const nextVersion = existingForm.version + 1;
+      const organizationId = existingForm.organizationId;
 
       await tx
         .update(formDefinitions)
@@ -419,6 +433,7 @@ export class FormService {
           if (field.options && field.options.length > 0) {
             await tx.insert(formOptions).values(
               field.options.map((opt) => ({
+                organizationId,
                 formFieldId: field.id!,
                 parentOptionId: opt.parentOptionId ?? null,
                 label: opt.label,
@@ -432,6 +447,7 @@ export class FormService {
           const [createdField] = await tx
             .insert(formFields)
             .values({
+              organizationId,
               formDefinitionId: formId,
               fieldKey: field.fieldKey,
               label: field.label,
@@ -448,6 +464,7 @@ export class FormService {
           if (field.options && field.options.length > 0) {
             await tx.insert(formOptions).values(
               field.options.map((opt) => ({
+                organizationId,
                 formFieldId: createdField.id,
                 parentOptionId: opt.parentOptionId ?? null,
                 label: opt.label,
@@ -479,6 +496,7 @@ export class FormService {
       }
 
       await tx.insert(events).values({
+        organizationId,
         streamId: `form-${formId}`,
         eventType: "FormUpdated",
         eventData: { formId, newVersion: nextVersion },
@@ -503,12 +521,14 @@ export class FormService {
       // Get current form version before publishing
       const currentForm = await tx.query.formDefinitions.findFirst({
         where: eq(formDefinitions.id, formId),
-        columns: { version: true },
+        columns: { version: true, organizationId: true },
       });
 
       if (!currentForm) {
         throw new Error("Form not found");
       }
+
+      const organizationId = currentForm.organizationId;
 
       // Create snapshot before publishing
       await this.createSnapshot(tx, formId, currentForm.version);
@@ -525,6 +545,7 @@ export class FormService {
         .returning();
 
       await tx.insert(events).values({
+        organizationId,
         streamId: `form-${formId}`,
         eventType: "FormPublished",
         eventData: { formId, version: currentForm.version },
@@ -551,6 +572,7 @@ export class FormService {
         .returning();
 
       await tx.insert(events).values({
+        organizationId: form.organizationId,
         streamId: `form-${formId}`,
         eventType: "FormArchived",
         eventData: { formId },

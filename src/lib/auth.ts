@@ -20,6 +20,16 @@ export const auth = betterAuth({
         defaultValue: "parent",
         input: false, // Don't allow users to set this directly
       },
+      activeOrganizationId: {
+        type: "string",
+        required: false,
+        input: false, // Set via server action, not user input
+      },
     },
+  },
+  session: {
+    // Extend session with organization context
+    // Note: Better Auth automatically includes user fields in session
+    // Additional custom session fields can be added here if needed
   },
 });
