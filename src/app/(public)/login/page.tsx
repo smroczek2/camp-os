@@ -1,14 +1,27 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tent } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { getSession } from "@/lib/auth-helper";
 
 export const metadata = {
   title: "Sign In - Camp OS",
   description: "Sign in to your Camp OS account",
 };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Redirect if already signed in
+  const session = await getSession();
+
+  if (session?.user) {
+    // Super admins go to admin portal, others go to dashboard
+    if (session.user.role === "super_admin") {
+      redirect("/super-admin");
+    }
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
