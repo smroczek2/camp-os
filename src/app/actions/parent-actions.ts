@@ -2,7 +2,7 @@
 
 import { getSession } from "@/lib/auth-helper";
 import { enforcePermission } from "@/lib/rbac";
-import { db } from "@/lib/db";
+import { withOrganizationContext } from "@/lib/db/tenant-context";
 import { children, registrations, events } from "@/lib/schema";
 import { registrationService } from "@/services/registration-service";
 import { eq, and } from "drizzle-orm";
@@ -23,6 +23,10 @@ export async function addChildAction(data: {
     throw new Error("Unauthorized");
   }
 
+  if (!session.user.activeOrganizationId) {
+    throw new Error("No active organization. Please select an organization.");
+  }
+
   // Check permission
   await enforcePermission(session.user.id, "child", "create");
 
@@ -32,30 +36,40 @@ export async function addChildAction(data: {
     throw new Error("Invalid date of birth");
   }
 
-  // Create child
-  const [child] = await db
-    .insert(children)
-    .values({
-      userId: session.user.id,
-      firstName: data.firstName.trim(),
-      lastName: data.lastName.trim(),
-      dateOfBirth: dob,
-      allergies: data.allergies || [],
-      medicalNotes: data.medicalNotes?.trim() || null,
-    })
-    .returning();
+  // Create child within organization context
+  const result = await withOrganizationContext(
+    session.user.activeOrganizationId,
+    async (tx) => {
+      // Create child
+      const [child] = await tx
+        .insert(children)
+        .values({
+          organizationId: session.user.activeOrganizationId!,
+          userId: session.user.id,
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          dateOfBirth: dob,
+          allergies: data.allergies || [],
+          medicalNotes: data.medicalNotes?.trim() || null,
+        })
+        .returning();
 
-  // Log event
-  await db.insert(events).values({
-    streamId: `child-${child.id}`,
-    eventType: "ChildCreated",
-    eventData: child as unknown as Record<string, unknown>,
-    version: 1,
-    userId: session.user.id,
-  });
+      // Log event
+      await tx.insert(events).values({
+        organizationId: session.user.activeOrganizationId!,
+        streamId: `child-${child.id}`,
+        eventType: "ChildCreated",
+        eventData: child as unknown as Record<string, unknown>,
+        version: 1,
+        userId: session.user.id,
+      });
+
+      return child;
+    }
+  );
 
   revalidatePath("/dashboard/parent");
-  return { success: true, child };
+  return { success: true, child: result };
 }
 
 /**
@@ -70,39 +84,55 @@ export async function registerForSessionAction(data: {
     throw new Error("Unauthorized");
   }
 
+  if (!session.user.activeOrganizationId) {
+    throw new Error("No active organization. Please select an organization.");
+  }
+
   // Check permission
   await enforcePermission(session.user.id, "registration", "create");
 
-  // Verify child belongs to user
-  const child = await db.query.children.findFirst({
-    where: and(
-      eq(children.id, data.childId),
-      eq(children.userId, session.user.id)
-    ),
-  });
+  // Verify child belongs to user and create registration within org context
+  const registration = await withOrganizationContext(
+    session.user.activeOrganizationId,
+    async (tx) => {
+      // Verify child belongs to user (RLS ensures it's in same org)
+      const child = await tx.query.children.findFirst({
+        where: and(
+          eq(children.id, data.childId),
+          eq(children.userId, session.user.id)
+        ),
+      });
 
-  if (!child) {
-    throw new Error("Child not found or you don't have permission");
-  }
+      if (!child) {
+        throw new Error("Child not found or you don't have permission");
+      }
 
-  // Check if already registered
-  const existing = await db.query.registrations.findFirst({
-    where: and(
-      eq(registrations.childId, data.childId),
-      eq(registrations.sessionId, data.sessionId)
-    ),
-  });
+      // Check if already registered
+      const existing = await tx.query.registrations.findFirst({
+        where: and(
+          eq(registrations.childId, data.childId),
+          eq(registrations.sessionId, data.sessionId)
+        ),
+      });
 
-  if (existing) {
-    throw new Error("Child is already registered for this session");
-  }
+      if (existing) {
+        throw new Error("Child is already registered for this session");
+      }
 
-  // Create registration
-  const registration = await registrationService.create({
-    userId: session.user.id,
-    childId: data.childId,
-    sessionId: data.sessionId,
-  });
+      // Create registration
+      const registration = await registrationService.create(
+        {
+          userId: session.user.id,
+          childId: data.childId,
+          sessionId: data.sessionId,
+        },
+        session.user.activeOrganizationId!,
+        tx
+      );
+
+      return registration;
+    }
+  );
 
   revalidatePath("/dashboard/parent");
   return { success: true, registration };
@@ -117,26 +147,42 @@ export async function cancelRegistrationAction(registrationId: string) {
     throw new Error("Unauthorized");
   }
 
-  // Verify registration belongs to user
-  const registration = await db.query.registrations.findFirst({
-    where: eq(registrations.id, registrationId),
-  });
-
-  if (!registration) {
-    throw new Error("Registration not found");
+  if (!session.user.activeOrganizationId) {
+    throw new Error("No active organization. Please select an organization.");
   }
 
-  if (registration.userId !== session.user.id) {
-    throw new Error("You don't have permission to cancel this registration");
-  }
+  // Verify registration and cancel within org context
+  await withOrganizationContext(
+    session.user.activeOrganizationId,
+    async (tx) => {
+      // Verify registration belongs to user (RLS ensures same org)
+      const registration = await tx.query.registrations.findFirst({
+        where: eq(registrations.id, registrationId),
+      });
 
-  // Check permission
-  await enforcePermission(session.user.id, "registration", "update");
+      if (!registration) {
+        throw new Error("Registration not found");
+      }
 
-  // Cancel registration
-  await registrationService.cancel(registrationId, session.user.id);
+      if (registration.userId !== session.user.id) {
+        throw new Error(
+          "You don't have permission to cancel this registration"
+        );
+      }
+
+      // Check permission
+      await enforcePermission(session.user.id, "registration", "update");
+
+      // Cancel registration
+      await registrationService.cancel(
+        registrationId,
+        session.user.id,
+        session.user.activeOrganizationId!,
+        tx
+      );
+    }
+  );
 
   revalidatePath("/dashboard/parent");
   return { success: true };
 }
-

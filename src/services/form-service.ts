@@ -65,6 +65,7 @@ export class FormService {
     }
 
     await tx.insert(formSnapshots).values({
+      organizationId: completeForm.organizationId,
       formDefinitionId: formId,
       version,
       snapshot: completeForm as unknown as Record<string, unknown>,

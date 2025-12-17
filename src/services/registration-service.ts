@@ -1,61 +1,106 @@
-import { db } from "@/lib/db";
+import type { TenantTransaction } from "@/lib/db/tenant-context";
 import { registrations, events } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 
+/**
+ * Registration Service
+ *
+ * Note: All methods now accept a transaction object from withOrganizationContext
+ * to ensure RLS context is maintained and operations are atomic.
+ */
 export class RegistrationService {
-  async create(data: {
-    userId: string;
-    childId: string;
-    sessionId: string;
-    amountPaid?: string;
-  }) {
-    return db.transaction(async (tx) => {
-      // Create registration
-      const [registration] = await tx
-        .insert(registrations)
-        .values({
-          ...data,
-          status: "pending",
-        })
-        .returning();
+  /**
+   * Create a new registration
+   *
+   * Note: This method should be called within withOrganizationContext
+   */
+  async create(
+    data: {
+      userId: string;
+      childId: string;
+      sessionId: string;
+      amountPaid?: string;
+    },
+    organizationId: string,
+    tx?: TenantTransaction
+  ) {
+    // If no transaction provided, throw error (must use withOrganizationContext)
+    if (!tx) {
+      throw new Error(
+        "RegistrationService.create must be called within withOrganizationContext"
+      );
+    }
 
-      // Log event
-      await tx.insert(events).values({
-        streamId: `registration-${registration.id}`,
-        eventType: "RegistrationCreated",
-        eventData: registration as unknown as Record<string, unknown>,
-        version: 1,
+    // Create registration
+    const [registration] = await tx
+      .insert(registrations)
+      .values({
+        organizationId,
         userId: data.userId,
-      });
+        childId: data.childId,
+        sessionId: data.sessionId,
+        amountPaid: data.amountPaid,
+        status: "pending",
+      })
+      .returning();
 
-      return registration;
+    // Log event
+    await tx.insert(events).values({
+      organizationId,
+      streamId: `registration-${registration.id}`,
+      eventType: "RegistrationCreated",
+      eventData: registration as unknown as Record<string, unknown>,
+      version: 1,
+      userId: data.userId,
     });
+
+    return registration;
   }
 
-  async cancel(registrationId: string, userId: string) {
-    return db.transaction(async (tx) => {
-      // Update registration
-      const [registration] = await tx
-        .update(registrations)
-        .set({ status: "canceled" })
-        .where(eq(registrations.id, registrationId))
-        .returning();
+  /**
+   * Cancel a registration
+   *
+   * Note: This method should be called within withOrganizationContext
+   */
+  async cancel(
+    registrationId: string,
+    userId: string,
+    organizationId: string,
+    tx?: TenantTransaction
+  ) {
+    if (!tx) {
+      throw new Error(
+        "RegistrationService.cancel must be called within withOrganizationContext"
+      );
+    }
 
-      // Log event
-      await tx.insert(events).values({
-        streamId: `registration-${registrationId}`,
-        eventType: "RegistrationCanceled",
-        eventData: { registrationId, canceledBy: userId },
-        version: 2,
-        userId,
-      });
+    // Update registration
+    const [registration] = await tx
+      .update(registrations)
+      .set({ status: "canceled" })
+      .where(eq(registrations.id, registrationId))
+      .returning();
 
-      return registration;
+    // Log event
+    await tx.insert(events).values({
+      organizationId,
+      streamId: `registration-${registrationId}`,
+      eventType: "RegistrationCanceled",
+      eventData: { registrationId, canceledBy: userId },
+      version: 2,
+      userId,
     });
+
+    return registration;
   }
 
-  async getByUser(userId: string) {
-    return db.query.registrations.findMany({
+  /**
+   * Get registrations by user
+   *
+   * Note: This method should be called within withOrganizationContext
+   */
+  async getByUser(userId: string, tx: TenantTransaction) {
+    return tx.query.registrations.findMany({
       where: eq(registrations.userId, userId),
       with: {
         child: true,
@@ -68,8 +113,13 @@ export class RegistrationService {
     });
   }
 
-  async getBySession(sessionId: string) {
-    return db.query.registrations.findMany({
+  /**
+   * Get registrations by session
+   *
+   * Note: This method should be called within withOrganizationContext
+   */
+  async getBySession(sessionId: string, tx: TenantTransaction) {
+    return tx.query.registrations.findMany({
       where: eq(registrations.sessionId, sessionId),
       with: {
         child: true,
@@ -84,27 +134,42 @@ export class RegistrationService {
     });
   }
 
-  async confirmPayment(registrationId: string, amountPaid: string) {
-    return db.transaction(async (tx) => {
-      const [registration] = await tx
-        .update(registrations)
-        .set({
-          status: "confirmed",
-          amountPaid,
-        })
-        .where(eq(registrations.id, registrationId))
-        .returning();
+  /**
+   * Confirm payment for a registration
+   *
+   * Note: This method should be called within withOrganizationContext
+   */
+  async confirmPayment(
+    registrationId: string,
+    amountPaid: string,
+    organizationId: string,
+    tx?: TenantTransaction
+  ) {
+    if (!tx) {
+      throw new Error(
+        "RegistrationService.confirmPayment must be called within withOrganizationContext"
+      );
+    }
 
-      await tx.insert(events).values({
-        streamId: `registration-${registrationId}`,
-        eventType: "PaymentCompleted",
-        eventData: { registrationId, amount: amountPaid },
-        version: 3,
-        userId: registration.userId,
-      });
+    const [registration] = await tx
+      .update(registrations)
+      .set({
+        status: "confirmed",
+        amountPaid,
+      })
+      .where(eq(registrations.id, registrationId))
+      .returning();
 
-      return registration;
+    await tx.insert(events).values({
+      organizationId,
+      streamId: `registration-${registrationId}`,
+      eventType: "PaymentCompleted",
+      eventData: { registrationId, amount: amountPaid },
+      version: 3,
+      userId: registration.userId,
     });
+
+    return registration;
   }
 }
 
