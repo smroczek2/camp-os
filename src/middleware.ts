@@ -104,6 +104,9 @@ function isPublicRoute(pathname: string): boolean {
     "/error",
     "/_next", // Next.js internals
     "/api/auth", // Better Auth endpoints
+    "/api/onboarding", // Organization signup
+    "/api/diagnostics", // System health checks
+    "/dev-login", // Development login
     "/favicon.ico",
   ];
 
