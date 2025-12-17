@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Calendar, AlertCircle, CheckCircle2, FileText, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { AddChildDialog } from "@/components/parent/add-child-dialog";
+import { RegisterSessionDialog } from "@/components/parent/register-session-dialog";
+import { formatDate } from "@/lib/utils";
 
 export default async function ParentDashboard() {
   const session = await getSession();
@@ -137,15 +140,15 @@ export default async function ParentDashboard() {
       </div>
 
       {/* Forms to Complete */}
-      {availableForms.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <FileText className="h-6 w-6" />
-              Forms to Complete
-            </h2>
-          </div>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <FileText className="h-6 w-6" />
+            Forms to Complete
+          </h2>
+        </div>
 
+        {availableForms.length > 0 ? (
           <div className="space-y-4">
             {availableForms.map((form) => {
               const isCompleted = mySubmissions.some(
@@ -206,14 +209,24 @@ export default async function ParentDashboard() {
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center p-12 border rounded-xl bg-muted/30">
+            <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground mb-2">
+              No forms available at this time
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Forms will appear here once you register for a camp session.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* My Children */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">My Children</h2>
-          {/* TODO: Add "Add Child" button */}
+          <AddChildDialog />
         </div>
 
         {myChildren.length === 0 ? (
@@ -238,8 +251,7 @@ export default async function ParentDashboard() {
                         {child.firstName} {child.lastName}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Born{" "}
-                        {new Date(child.dateOfBirth).toLocaleDateString()}
+                        Born {formatDate(child.dateOfBirth)}
                       </p>
                     </div>
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/10">
@@ -286,7 +298,12 @@ export default async function ParentDashboard() {
             <p className="text-muted-foreground mb-4">
               No camp registrations yet
             </p>
-            {/* TODO: Add "Browse Sessions" button */}
+            <Link href="#browse-sessions">
+              <Button>
+                Browse Available Sessions
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
           </div>
         ) : (
           <div className="space-y-4">
@@ -319,13 +336,8 @@ export default async function ParentDashboard() {
                       {registration.child.firstName} {registration.child.lastName}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(
-                        registration.session.startDate
-                      ).toLocaleDateString()}{" "}
-                      -{" "}
-                      {new Date(
-                        registration.session.endDate
-                      ).toLocaleDateString()}
+                      {formatDate(registration.session.startDate)} -{" "}
+                      {formatDate(registration.session.endDate)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -348,7 +360,7 @@ export default async function ParentDashboard() {
       </div>
 
       {/* Browse Available Sessions */}
-      <div className="mt-12">
+      <div id="browse-sessions" className="mt-12">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Browse Camp Sessions</h2>
         </div>
@@ -392,8 +404,8 @@ export default async function ParentDashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Dates</span>
                       <span className="font-medium">
-                        {new Date(session.startDate).toLocaleDateString()} -{" "}
-                        {new Date(session.endDate).toLocaleDateString()}
+                        {formatDate(session.startDate)} -{" "}
+                        {formatDate(session.endDate)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
@@ -413,17 +425,21 @@ export default async function ParentDashboard() {
                   </div>
 
                   {isOpen && spotsLeft > 0 ? (
-                    <Badge className="w-full justify-center bg-blue-500">
-                      Available
-                    </Badge>
+                    <div className="mt-4">
+                      <RegisterSessionDialog
+                        session={session}
+                        children={myChildren}
+                        disabled={myChildren.length === 0}
+                      />
+                    </div>
                   ) : !isOpen ? (
-                    <Badge variant="outline" className="w-full justify-center">
+                    <Badge variant="outline" className="w-full justify-center mt-4">
                       {session.status}
                     </Badge>
                   ) : (
                     <Badge
                       variant="outline"
-                      className="w-full justify-center text-red-600"
+                      className="w-full justify-center text-red-600 mt-4"
                     >
                       Full
                     </Badge>

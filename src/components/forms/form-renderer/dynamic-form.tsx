@@ -190,7 +190,7 @@ export function DynamicForm({
       // Clear draft after successful submission
       localStorage.removeItem(`form-draft-${formConfig.id}`);
 
-      router.push("/dashboard/parent?submitted=true");
+      router.push(`/dashboard/parent/forms/success?formId=${formConfig.id}`);
     } catch (error) {
       alert(
         `Error: ${error instanceof Error ? error.message : "Submission failed"}`

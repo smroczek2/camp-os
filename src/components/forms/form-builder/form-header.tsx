@@ -4,15 +4,17 @@ import {
   Card,
   CardHeader,
 } from "@/components/ui/card";
-import { Archive, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Archive, CheckCircle2, ArrowLeft, FileText } from "lucide-react";
 import Link from "next/link";
 
 type FormHeaderProps = {
+  formId: string;
   formName: string;
   formDescription?: string | null;
   status: string;
   isPublished: boolean;
   aiGenerated: boolean;
+  submissionCount?: number;
   view: "details" | "preview";
   isEditing: boolean;
   saving: boolean;
@@ -25,11 +27,13 @@ type FormHeaderProps = {
 };
 
 export function FormHeader({
+  formId,
   formName,
   formDescription,
   status,
   isPublished,
   aiGenerated,
+  submissionCount = 0,
   view,
   isEditing,
   saving,
@@ -92,6 +96,12 @@ export function FormHeader({
               >
                 Parent preview
               </Button>
+              <Link href={`/dashboard/admin/forms/${formId}/submissions`}>
+                <Button type="button" variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Submissions ({submissionCount})
+                </Button>
+              </Link>
             </div>
 
             <div className="flex flex-wrap gap-2">

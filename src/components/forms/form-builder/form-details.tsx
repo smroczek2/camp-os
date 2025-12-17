@@ -115,11 +115,13 @@ export function FormDetailsView({ form }: { form: FormDetails }) {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         <FormHeader
+          formId={form.id}
           formName={form.name}
           formDescription={form.description}
           status={form.status}
           isPublished={form.isPublished}
           aiGenerated={!!form.aiActionId}
+          submissionCount={form.submissions?.length ?? 0}
           view={view}
           isEditing={isEditing}
           saving={saving}

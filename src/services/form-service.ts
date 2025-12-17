@@ -193,7 +193,15 @@ export class FormService {
           columns: { id: true, name: true, email: true },
         },
         child: {
-          columns: { id: true, firstName: true, lastName: true },
+          columns: { id: true, firstName: true, lastName: true, dateOfBirth: true },
+        },
+        session: {
+          columns: { id: true, startDate: true, endDate: true },
+          with: {
+            camp: {
+              columns: { id: true, name: true },
+            },
+          },
         },
       },
       orderBy: (submissions, { desc }) => [desc(submissions.submittedAt)],
