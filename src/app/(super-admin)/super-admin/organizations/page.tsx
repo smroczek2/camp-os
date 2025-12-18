@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { getOrganizationsAction } from "@/app/actions/super-admin-actions";
 import { OrganizationsTable } from "@/components/super-admin/organizations-table";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Organizations - Camp OS Admin",
   description: "Manage all Camp OS organizations",

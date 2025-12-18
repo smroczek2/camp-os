@@ -16,6 +16,8 @@ import { Users } from "lucide-react";
 import { getSession } from "@/lib/auth-helper";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Users - Camp OS Admin",
   description: "Manage all Camp OS users across organizations",
