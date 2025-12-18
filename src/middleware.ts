@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { organizations, organizationUsers } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { organizations } from "@/lib/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Multi-tenant middleware
@@ -130,25 +130,6 @@ function isPublicRoute(pathname: string): boolean {
   ];
 
   return publicPaths.some((path) => pathname.startsWith(path));
-}
-
-/**
- * Helper to check if user belongs to organization
- * Called after authentication check
- */
-async function userBelongsToOrganization(
-  userId: string,
-  organizationId: string
-): Promise<boolean> {
-  const membership = await db.query.organizationUsers.findFirst({
-    where: and(
-      eq(organizationUsers.userId, userId),
-      eq(organizationUsers.organizationId, organizationId),
-      eq(organizationUsers.status, "active")
-    ),
-  });
-
-  return !!membership;
 }
 
 /**
