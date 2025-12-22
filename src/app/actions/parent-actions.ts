@@ -3,8 +3,9 @@
 import { getSession } from "@/lib/auth-helper";
 import { enforcePermission } from "@/lib/rbac";
 import { db } from "@/lib/db";
-import { children, registrations, events } from "@/lib/schema";
+import { children, registrations, events, sessions } from "@/lib/schema";
 import { registrationService } from "@/services/registration-service";
+import { sendRegistrationConfirmationEmail } from "@/lib/email/send";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -78,7 +79,7 @@ export async function registerForSessionAction(data: {
   await enforcePermission(session.user.id, "registration", "create");
 
   // Verify child belongs to user and create registration
-  const registration = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // Verify child belongs to user
     const child = await tx.query.children.findFirst({
       where: and(
@@ -103,6 +104,15 @@ export async function registerForSessionAction(data: {
       throw new Error("Child is already registered for this session");
     }
 
+    // Get session details for email
+    const sessionData = await tx.query.sessions.findFirst({
+      where: eq(sessions.id, data.sessionId),
+    });
+
+    if (!sessionData) {
+      throw new Error("Session not found");
+    }
+
     // Create registration
     const newRegistration = await registrationService.create({
       userId: session.user.id,
@@ -110,11 +120,44 @@ export async function registerForSessionAction(data: {
       sessionId: data.sessionId,
     });
 
-    return newRegistration;
+    return {
+      registration: newRegistration,
+      child,
+      session: sessionData,
+    };
   });
 
+  // Send registration confirmation email
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const checkoutUrl = `${baseUrl}/checkout/${result.registration.id}`;
+
+    await sendRegistrationConfirmationEmail(session.user.email, {
+      parentName: session.user.name,
+      childName: `${result.child.firstName} ${result.child.lastName}`,
+      sessionName: result.session.name,
+      sessionStartDate: result.session.startDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      sessionEndDate: result.session.endDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      sessionPrice: result.session.price,
+      checkoutUrl,
+    });
+  } catch (emailError) {
+    // Log error but don't fail the registration
+    console.error("Failed to send registration confirmation email:", emailError);
+  }
+
   revalidatePath("/dashboard/parent");
-  return { success: true, registration };
+  return { success: true, registration: result.registration };
 }
 
 /**

@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
-import { attendance } from "@/lib/schema";
-import { desc, and, gte, lte } from "drizzle-orm";
+import { attendance, sessions } from "@/lib/schema";
+import { desc, and, gte, lte, eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import {
   Calendar,
@@ -15,6 +15,7 @@ import {
   UserX,
 } from "lucide-react";
 import Link from "next/link";
+import { CheckInListWrapper } from "@/components/admin/check-in-list-wrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function AttendanceDashboardPage() {
     redirect("/login");
   }
 
-  if (session.user.role !== "admin") {
+  if (!["admin", "staff"].includes(session.user.role)) {
     redirect("/dashboard");
   }
 
@@ -51,16 +52,18 @@ export default async function AttendanceDashboardPage() {
     orderBy: [desc(attendance.checkedInAt)],
   });
 
-  // Get active sessions (open or in-progress)
+  // Get active sessions (open status)
   const activeSessions = await db.query.sessions.findMany({
-    where: (sessions, { eq }) => eq(sessions.status, "open"),
+    where: eq(sessions.status, "open"),
     with: {
       registrations: {
+        where: (registrations, { eq }) => eq(registrations.status, "confirmed"),
         with: {
           child: true,
         },
       },
     },
+    orderBy: [desc(sessions.startDate)],
   });
 
   // Get all groups for display
@@ -81,7 +84,7 @@ export default async function AttendanceDashboardPage() {
   ).length;
   const checkedOutToday = todayAttendance.filter((a) => a.checkedOutAt).length;
   const totalRegistered = activeSessions.reduce(
-    (sum, s) => sum + s.registrations.filter((r) => r.status === "confirmed").length,
+    (sum, s) => sum + s.registrations.length,
     0
   );
   const notCheckedIn = totalRegistered - todayAttendance.length;
@@ -165,6 +168,38 @@ export default async function AttendanceDashboardPage() {
         </div>
       </div>
 
+      {/* Active Sessions Check-In */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold mb-6">Check-In / Check-Out</h2>
+
+        {activeSessions.length === 0 ? (
+          <div className="text-center p-12 border rounded-xl bg-muted/30">
+            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">No active sessions today</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {activeSessions.map((activeSession) => (
+              <div key={activeSession.id} className="border rounded-xl p-6 bg-card shadow-sm">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xl font-semibold">{activeSession.name}</h3>
+                    <Badge variant="default">
+                      {activeSession.registrations.length} Registered
+                    </Badge>
+                  </div>
+                  {activeSession.description && (
+                    <p className="text-sm text-muted-foreground">{activeSession.description}</p>
+                  )}
+                </div>
+
+                <CheckInListWrapper sessionId={activeSession.id} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Groups Overview */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold mb-6">Groups</h2>
@@ -229,7 +264,7 @@ export default async function AttendanceDashboardPage() {
 
       {/* Today's Activity */}
       <div>
-        <h2 className="text-2xl font-bold mb-6">Today&apos;s Activity</h2>
+        <h2 className="text-2xl font-bold mb-6">Today&apos;s Activity Log</h2>
 
         {todayAttendance.length === 0 ? (
           <div className="text-center p-12 border rounded-xl bg-muted/30">

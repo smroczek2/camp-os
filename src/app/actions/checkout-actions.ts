@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
 import { registrations, events } from "@/lib/schema";
+import { sendPaymentReceivedEmail } from "@/lib/email/send";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -62,7 +63,7 @@ export async function processPaymentAction(
 
     // Process the mock payment - in production this would call Stripe
     // For mock mode, we simply update the registration status
-    const [updated] = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // Update registration to confirmed with payment amount
       const [updatedReg] = await tx
         .update(registrations)
@@ -72,6 +73,15 @@ export async function processPaymentAction(
         })
         .where(eq(registrations.id, parsed.data.registrationId))
         .returning();
+
+      // Get full registration details with session and child for email
+      const fullRegistration = await tx.query.registrations.findFirst({
+        where: eq(registrations.id, parsed.data.registrationId),
+        with: {
+          session: true,
+          child: true,
+        },
+      });
 
       // Log the payment event
       await tx.insert(events).values({
@@ -87,13 +97,53 @@ export async function processPaymentAction(
         userId: session.user.id,
       });
 
-      return [updatedReg];
+      return {
+        registration: updatedReg,
+        fullData: fullRegistration,
+      };
     });
+
+    // Send payment received email
+    if (result.fullData) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        const dashboardUrl = `${baseUrl}/dashboard/parent`;
+
+        await sendPaymentReceivedEmail(session.user.email, {
+          parentName: session.user.name,
+          childName: `${result.fullData.child.firstName} ${result.fullData.child.lastName}`,
+          sessionName: result.fullData.session.name,
+          sessionStartDate: result.fullData.session.startDate.toLocaleDateString(
+            "en-US",
+            {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }
+          ),
+          sessionEndDate: result.fullData.session.endDate.toLocaleDateString(
+            "en-US",
+            {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }
+          ),
+          amountPaid: parsed.data.amount,
+          dashboardUrl,
+        });
+      } catch (emailError) {
+        // Log error but don't fail the payment
+        console.error("Failed to send payment received email:", emailError);
+      }
+    }
 
     revalidatePath("/dashboard/parent");
     revalidatePath(`/checkout/${parsed.data.registrationId}`);
 
-    return { success: true, registration: updated };
+    return { success: true, registration: result.registration };
   } catch (error) {
     console.error("Failed to process payment:", error);
     return { success: false, error: "Payment processing failed. Please try again." };

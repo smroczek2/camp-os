@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
+import { medications } from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Pill, Activity, Users } from "lucide-react";
+import { AlertCircle, Pill, Activity, Users, Clock } from "lucide-react";
+import { MedicationLogForm } from "@/components/nurse/medication-log-form";
+import { and, lte, or, isNull, gte, desc } from "drizzle-orm";
 
 export default async function NurseDashboard() {
   const session = await getSession();
@@ -18,6 +21,47 @@ export default async function NurseDashboard() {
       registrations: {
         with: {
           session: true,
+        },
+      },
+    },
+  });
+
+  // Get medications due today (active medications)
+  const today = new Date();
+  const todayStart = new Date(today.setHours(0, 0, 0, 0));
+  const todayEnd = new Date(today.setHours(23, 59, 59, 999));
+
+  const medicationsDueToday = await db.query.medications.findMany({
+    where: and(
+      lte(medications.startDate, todayEnd),
+      or(isNull(medications.endDate), gte(medications.endDate, todayStart))
+    ),
+    with: {
+      child: {
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      },
+      logs: {
+        where: and(
+          gte(medications.createdAt, todayStart),
+          lte(medications.createdAt, todayEnd)
+        ),
+        orderBy: desc(medications.createdAt),
+        limit: 5,
+        with: {
+          administrator: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
     },
@@ -135,6 +179,94 @@ export default async function NurseDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Medications Due Today */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+          <Clock className="h-6 w-6 text-blue-600" />
+          Medications Due Today
+        </h2>
+        {medicationsDueToday.length === 0 ? (
+          <div className="text-center p-12 border rounded-xl bg-muted/30">
+            <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">
+              No medications scheduled for today
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {medicationsDueToday.map((med) => {
+              const todayLogs = med.logs.filter((log) => {
+                const logDate = new Date(log.administeredAt);
+                return (
+                  logDate >= todayStart && logDate <= todayEnd
+                );
+              });
+              const isAdministeredToday = todayLogs.length > 0;
+
+              return (
+                <div
+                  key={med.id}
+                  className={`p-4 border rounded-xl ${
+                    isAdministeredToday
+                      ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                      : "bg-card shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <p className="font-semibold">
+                        {med.child.firstName} {med.child.lastName}
+                      </p>
+                      <p className="text-lg font-medium text-blue-600 mt-1">
+                        {med.name}
+                      </p>
+                    </div>
+                    {isAdministeredToday && (
+                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900">
+                        Given Today
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1 mb-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Dosage:</strong> {med.dosage}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Frequency:</strong> {med.frequency}
+                    </p>
+                    {med.instructions && (
+                      <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                        {med.instructions}
+                      </p>
+                    )}
+                  </div>
+                  <MedicationLogForm
+                    medication={{
+                      id: med.id,
+                      name: med.name,
+                      dosage: med.dosage,
+                      frequency: med.frequency,
+                      instructions: med.instructions,
+                      childId: med.childId,
+                    }}
+                    child={{
+                      id: med.child.id,
+                      firstName: med.child.firstName,
+                      lastName: med.child.lastName,
+                    }}
+                    recentLogs={med.logs.map((log) => ({
+                      administeredAt: log.administeredAt,
+                      dosage: log.dosage,
+                      administrator: log.administrator,
+                    }))}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Medical Alerts */}

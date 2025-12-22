@@ -1,5 +1,5 @@
 ---
-status: ready
+status: complete
 priority: p1
 issue_id: "021"
 tags: [ui, backend, crud, medications, documents, groups]

@@ -1,5 +1,5 @@
 ---
-status: ready
+status: complete
 priority: p2
 issue_id: "026"
 tags: [email, notifications, communication, ux]

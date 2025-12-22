@@ -1,5 +1,5 @@
 ---
-status: ready
+status: complete
 priority: p1
 issue_id: "002"
 tags: [security, dependencies, npm, critical]

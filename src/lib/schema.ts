@@ -220,6 +220,39 @@ export const registrations = pgTable(
   })
 );
 
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .references(() => sessions.id, { onDelete: "cascade" })
+      .notNull(),
+    childId: uuid("child_id")
+      .references(() => children.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: text("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    position: integer("position").notNull(),
+    status: text("status").notNull().default("waiting"), // waiting, offered, expired, converted
+    offeredAt: timestamp("offered_at"),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionChildUnique: uniqueIndex("waitlist_session_child_unique").on(
+      table.sessionId,
+      table.childId
+    ),
+    sessionPositionIdx: index("waitlist_session_position_idx").on(
+      table.sessionId,
+      table.position
+    ),
+    userIdx: index("waitlist_user_idx").on(table.userId),
+    statusIdx: index("waitlist_status_idx").on(table.status),
+  })
+);
+
 export const incidents = pgTable(
   "incidents",
   {
@@ -614,6 +647,7 @@ export const formSubmissions = pgTable(
 export const userRelations = relations(user, ({ many }) => ({
   children: many(children),
   registrations: many(registrations),
+  waitlist: many(waitlist),
   documents: many(documents),
   reportedIncidents: many(incidents),
   assignments: many(assignments),
@@ -628,6 +662,7 @@ export const childrenRelations = relations(children, ({ one, many }) => ({
   emergencyContacts: many(emergencyContacts),
   medications: many(medications),
   registrations: many(registrations),
+  waitlist: many(waitlist),
   incidents: many(incidents),
   documents: many(documents),
   groupMembers: many(groupMembers),
@@ -644,6 +679,7 @@ export const emergencyContactsRelations = relations(emergencyContacts, ({ one })
 
 export const sessionsRelations = relations(sessions, ({ many }) => ({
   registrations: many(registrations),
+  waitlist: many(waitlist),
   groups: many(groups),
   assignments: many(assignments),
   sessionForms: many(sessionForms),
@@ -673,6 +709,21 @@ export const registrationsRelations = relations(registrations, ({ one }) => ({
   }),
   session: one(sessions, {
     fields: [registrations.sessionId],
+    references: [sessions.id],
+  }),
+}));
+
+export const waitlistRelations = relations(waitlist, ({ one }) => ({
+  user: one(user, {
+    fields: [waitlist.userId],
+    references: [user.id],
+  }),
+  child: one(children, {
+    fields: [waitlist.childId],
+    references: [children.id],
+  }),
+  session: one(sessions, {
+    fields: [waitlist.sessionId],
     references: [sessions.id],
   }),
 }));

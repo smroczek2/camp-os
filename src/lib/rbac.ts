@@ -16,7 +16,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
   parent: {
     child: ["create", "read", "update"],
     registration: ["create", "read", "cancel"],
-    medication: ["read"],
+    medication: ["create", "read", "update", "delete"],
     medicalRecord: ["read", "update"],
     document: ["create", "read", "delete"],
     incident: ["read"],
@@ -26,7 +26,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
   staff: {
     child: ["read"],
     registration: ["read"],
-    medication: ["read"],
+    medication: ["read", "update"],
     incident: ["create", "read", "update"],
     attendance: ["create", "update"],
     form: ["read"],
