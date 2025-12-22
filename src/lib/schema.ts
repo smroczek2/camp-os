@@ -20,8 +20,7 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("emailVerified"),
   image: text("image"),
-  role: text("role").notNull().default("parent"), // parent, staff, admin, nurse, super_admin
-  activeOrganizationId: text("active_organization_id"), // Current organization context for the user
+  role: text("role").notNull().default("parent"), // parent, staff, admin, nurse
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
@@ -66,67 +65,12 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updatedAt").defaultNow(),
 });
 
-// Multi-tenant tables
-
-export const organizations = pgTable(
-  "organizations",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
-    status: text("status").notNull().default("active"), // active, suspended, trial, inactive
-    subscriptionTier: text("subscription_tier").notNull().default("free"), // free, pro, enterprise
-    maxCampers: integer("max_campers").default(100),
-    maxStaff: integer("max_staff").default(20),
-    contactEmail: text("contact_email").notNull(),
-    contactPhone: text("contact_phone"),
-    timezone: text("timezone").default("America/New_York"),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    slugIdx: index("organizations_slug_idx").on(table.slug),
-    statusIdx: index("organizations_status_idx").on(table.status),
-  })
-);
-
-export const organizationUsers = pgTable(
-  "organization_users",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
-    userId: text("user_id")
-      .references(() => user.id, { onDelete: "cascade" })
-      .notNull(),
-    role: text("role").notNull().default("member"), // owner, admin, member
-    invitedBy: text("invited_by").references(() => user.id),
-    invitedAt: timestamp("invited_at"),
-    joinedAt: timestamp("joined_at"),
-    status: text("status").notNull().default("active"), // invited, active, suspended
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    orgUserIdx: index("organization_users_org_user_idx").on(
-      table.organizationId,
-      table.userId
-    ),
-    userIdx: index("organization_users_user_idx").on(table.userId),
-  })
-);
-
 // Camp OS tables
 
 export const children = pgTable(
   "children",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     userId: text("user_id")
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
@@ -139,12 +83,31 @@ export const children = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgUserIdx: index("children_org_user_idx").on(
-      table.organizationId,
-      table.userId
-    ),
     userIdx: index("children_user_idx").on(table.userId),
     dobIdx: index("children_dob_idx").on(table.dateOfBirth),
+  })
+);
+
+export const emergencyContacts = pgTable(
+  "emergency_contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    childId: uuid("child_id")
+      .references(() => children.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    relationship: text("relationship").notNull(), // e.g., "mother", "father", "grandparent", "aunt", "neighbor"
+    phone: text("phone").notNull(),
+    email: text("email"),
+    priority: integer("priority").notNull().default(1), // 1 = primary, 2 = secondary, etc.
+    isAuthorizedPickup: boolean("is_authorized_pickup").notNull().default(false),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    childIdx: index("emergency_contacts_child_idx").on(table.childId),
+    priorityIdx: index("emergency_contacts_priority_idx").on(table.childId, table.priority),
   })
 );
 
@@ -152,9 +115,6 @@ export const medications = pgTable(
   "medications",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     childId: uuid("child_id")
       .references(() => children.id, { onDelete: "cascade" })
       .notNull(),
@@ -167,25 +127,7 @@ export const medications = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("medications_org_idx").on(table.organizationId),
-  })
-);
-
-export const camps = pgTable(
-  "camps",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
-    name: text("name").notNull(),
-    description: text("description"),
-    location: text("location"),
-    capacity: integer("capacity").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    orgIdx: index("camps_org_idx").on(table.organizationId),
+    childIdx: index("medications_child_idx").on(table.childId),
   })
 );
 
@@ -193,24 +135,56 @@ export const sessions = pgTable(
   "sessions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
-    campId: uuid("camp_id")
-      .references(() => camps.id, { onDelete: "cascade" })
-      .notNull(),
+    name: text("name").notNull(), // Required - e.g., "Summer Week 1", "Art Camp June"
+    description: text("description"),
     startDate: timestamp("start_date").notNull(),
     endDate: timestamp("end_date").notNull(),
     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
     capacity: integer("capacity").notNull(),
     status: text("status").notNull().default("draft"), // draft, open, closed, completed
     createdAt: timestamp("created_at").defaultNow().notNull(),
+
+    // Eligibility
+    minAge: integer("min_age"),
+    maxAge: integer("max_age"),
+    minGrade: integer("min_grade"), // -1=PreK, 0=K, 1-12=grades
+    maxGrade: integer("max_grade"),
+
+    // Registration window
+    registrationOpenDate: timestamp("registration_open_date"),
+    registrationCloseDate: timestamp("registration_close_date"),
+
+    // Additional details
+    specialInstructions: text("special_instructions"),
+    whatToBring: text("what_to_bring"),
   },
   (table) => ({
-    orgCampIdx: index("sessions_org_camp_idx").on(
-      table.organizationId,
-      table.campId
+    statusIdx: index("sessions_status_idx").on(table.status),
+    dateIdx: index("sessions_date_idx").on(table.startDate, table.endDate),
+  })
+);
+
+// Junction table for attaching forms to sessions
+export const sessionForms = pgTable(
+  "session_forms",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .references(() => sessions.id, { onDelete: "cascade" })
+      .notNull(),
+    formId: uuid("form_id")
+      .references(() => formDefinitions.id, { onDelete: "cascade" })
+      .notNull(),
+    required: boolean("required").default(true),
+    displayOrder: integer("display_order").default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionFormUniqueIdx: uniqueIndex("session_form_unique").on(
+      table.sessionId,
+      table.formId
     ),
+    sessionIdx: index("session_forms_session_idx").on(table.sessionId),
   })
 );
 
@@ -218,9 +192,6 @@ export const registrations = pgTable(
   "registrations",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     userId: text("user_id")
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
@@ -235,20 +206,13 @@ export const registrations = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgSessionIdx: index("registrations_org_session_idx").on(
-      table.organizationId,
-      table.sessionId
-    ),
-    orgStatusIdx: index("registrations_org_status_idx").on(
-      table.organizationId,
-      table.status
-    ),
     userSessionIdx: index("registrations_user_session_idx").on(
       table.userId,
       table.sessionId
     ),
     statusIdx: index("registrations_status_idx").on(table.status),
     childIdx: index("registrations_child_idx").on(table.childId),
+    sessionIdx: index("registrations_session_idx").on(table.sessionId),
     uniqueRegistration: uniqueIndex("registrations_child_session_unique").on(
       table.childId,
       table.sessionId
@@ -260,9 +224,6 @@ export const incidents = pgTable(
   "incidents",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     childId: uuid("child_id")
       .references(() => children.id, { onDelete: "cascade" })
       .notNull(),
@@ -277,7 +238,6 @@ export const incidents = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("incidents_org_idx").on(table.organizationId),
     childIdx: index("incidents_child_idx").on(table.childId),
     typeIdx: index("incidents_type_idx").on(table.type),
     timestampIdx: index("incidents_timestamp_idx").on(table.occurredAt),
@@ -288,9 +248,6 @@ export const documents = pgTable(
   "documents",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     userId: text("user_id")
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
@@ -304,7 +261,8 @@ export const documents = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("documents_org_idx").on(table.organizationId),
+    userIdx: index("documents_user_idx").on(table.userId),
+    childIdx: index("documents_child_idx").on(table.childId),
   })
 );
 
@@ -312,9 +270,6 @@ export const events = pgTable(
   "events",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }),
     streamId: text("stream_id").notNull(),
     eventType: text("event_type").notNull(),
     eventData: jsonb("event_data").notNull().$type<Record<string, unknown>>(),
@@ -323,7 +278,6 @@ export const events = pgTable(
     userId: text("user_id").references(() => user.id),
   },
   (table) => ({
-    orgIdx: index("events_org_idx").on(table.organizationId),
     streamIdx: index("events_stream_idx").on(table.streamId, table.version),
     typeIdx: index("events_type_idx").on(table.eventType),
     timestampIdx: index("events_timestamp_idx").on(table.timestamp),
@@ -334,9 +288,6 @@ export const groups = pgTable(
   "groups",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     sessionId: uuid("session_id")
       .references(() => sessions.id, { onDelete: "cascade" })
       .notNull(),
@@ -348,7 +299,6 @@ export const groups = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("groups_org_idx").on(table.organizationId),
     sessionIdx: index("groups_session_idx").on(table.sessionId),
   })
 );
@@ -357,9 +307,6 @@ export const assignments = pgTable(
   "assignments",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     staffId: text("staff_id")
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
@@ -373,7 +320,6 @@ export const assignments = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("assignments_org_idx").on(table.organizationId),
     staffGroupIdx: index("assignments_staff_group_idx").on(
       table.staffId,
       table.groupId
@@ -390,9 +336,6 @@ export const groupMembers = pgTable(
   "group_members",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     groupId: uuid("group_id")
       .references(() => groups.id, { onDelete: "cascade" })
       .notNull(),
@@ -402,7 +345,6 @@ export const groupMembers = pgTable(
     joinedAt: timestamp("joined_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("group_members_org_idx").on(table.organizationId),
     groupChildIdx: index("group_members_group_child_idx").on(
       table.groupId,
       table.childId
@@ -418,9 +360,6 @@ export const aiActions = pgTable(
   "ai_actions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     userId: text("user_id")
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
@@ -435,7 +374,6 @@ export const aiActions = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("ai_actions_org_idx").on(table.organizationId),
     userIdx: index("ai_actions_user_idx").on(table.userId),
     statusIdx: index("ai_actions_status_idx").on(table.status),
   })
@@ -445,9 +383,6 @@ export const attendance = pgTable(
   "attendance",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     childId: uuid("child_id")
       .references(() => children.id, { onDelete: "cascade" })
       .notNull(),
@@ -463,10 +398,9 @@ export const attendance = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgDateIdx: index("attendance_org_date_idx").on(
-      table.organizationId,
-      table.date
-    ),
+    dateIdx: index("attendance_date_idx").on(table.date),
+    sessionIdx: index("attendance_session_idx").on(table.sessionId),
+    childIdx: index("attendance_child_idx").on(table.childId),
   })
 );
 
@@ -474,9 +408,6 @@ export const medicationLogs = pgTable(
   "medication_logs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     childId: uuid("child_id")
       .references(() => children.id, { onDelete: "cascade" })
       .notNull(),
@@ -493,7 +424,8 @@ export const medicationLogs = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("medication_logs_org_idx").on(table.organizationId),
+    childIdx: index("medication_logs_child_idx").on(table.childId),
+    medicationIdx: index("medication_logs_medication_idx").on(table.medicationId),
   })
 );
 
@@ -503,12 +435,6 @@ export const formDefinitions = pgTable(
   "form_definitions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
-    campId: uuid("camp_id")
-      .references(() => camps.id, { onDelete: "cascade" })
-      .notNull(),
     sessionId: uuid("session_id").references(() => sessions.id, {
       onDelete: "cascade",
     }),
@@ -527,12 +453,9 @@ export const formDefinitions = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("form_definitions_org_idx").on(table.organizationId),
-    campIdx: index("form_definitions_camp_idx").on(table.campId),
     sessionIdx: index("form_definitions_session_idx").on(table.sessionId),
     statusIdx: index("form_definitions_status_idx").on(table.status),
-    campSessionStatusIdx: index("form_definitions_camp_session_status_idx").on(
-      table.campId,
+    sessionStatusIdx: index("form_definitions_session_status_idx").on(
       table.sessionId,
       table.status
     ),
@@ -543,9 +466,6 @@ export const formFields = pgTable(
   "form_fields",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     formDefinitionId: uuid("form_definition_id")
       .references(() => formDefinitions.id, { onDelete: "cascade" })
       .notNull(),
@@ -574,7 +494,6 @@ export const formFields = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("form_fields_org_idx").on(table.organizationId),
     formDefOrderIdx: index("form_fields_form_def_order_idx").on(
       table.formDefinitionId,
       table.displayOrder
@@ -594,9 +513,6 @@ export const formOptions = pgTable(
   "form_options",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     formFieldId: uuid("form_field_id")
       .references(() => formFields.id, { onDelete: "cascade" })
       .notNull(),
@@ -608,7 +524,6 @@ export const formOptions = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("form_options_org_idx").on(table.organizationId),
     fieldOrderIdx: index("form_options_field_order_idx").on(
       table.formFieldId,
       table.displayOrder
@@ -626,9 +541,6 @@ export const formSnapshots = pgTable(
   "form_snapshots",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     formDefinitionId: uuid("form_definition_id")
       .references(() => formDefinitions.id, { onDelete: "cascade" })
       .notNull(),
@@ -637,7 +549,6 @@ export const formSnapshots = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("form_snapshots_org_idx").on(table.organizationId),
     formVersionIdx: index("form_snapshots_form_version_idx").on(
       table.formDefinitionId,
       table.version
@@ -653,9 +564,6 @@ export const formSubmissions = pgTable(
   "form_submissions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .references(() => organizations.id, { onDelete: "cascade" })
-      .notNull(),
     formDefinitionId: uuid("form_definition_id")
       .references(() => formDefinitions.id, { onDelete: "restrict" })
       .notNull(),
@@ -679,7 +587,6 @@ export const formSubmissions = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    orgIdx: index("form_submissions_org_idx").on(table.organizationId),
     formDefIdx: index("form_submissions_form_def_idx").on(
       table.formDefinitionId
     ),
@@ -718,6 +625,7 @@ export const childrenRelations = relations(children, ({ one, many }) => ({
     fields: [children.userId],
     references: [user.id],
   }),
+  emergencyContacts: many(emergencyContacts),
   medications: many(medications),
   registrations: many(registrations),
   incidents: many(incidents),
@@ -727,18 +635,31 @@ export const childrenRelations = relations(children, ({ one, many }) => ({
   medicationLogs: many(medicationLogs),
 }));
 
-export const campsRelations = relations(camps, ({ many }) => ({
-  sessions: many(sessions),
+export const emergencyContactsRelations = relations(emergencyContacts, ({ one }) => ({
+  child: one(children, {
+    fields: [emergencyContacts.childId],
+    references: [children.id],
+  }),
 }));
 
-export const sessionsRelations = relations(sessions, ({ one, many }) => ({
-  camp: one(camps, {
-    fields: [sessions.campId],
-    references: [camps.id],
-  }),
+export const sessionsRelations = relations(sessions, ({ many }) => ({
   registrations: many(registrations),
   groups: many(groups),
   assignments: many(assignments),
+  sessionForms: many(sessionForms),
+  formDefinitions: many(formDefinitions),
+  attendance: many(attendance),
+}));
+
+export const sessionFormsRelations = relations(sessionForms, ({ one }) => ({
+  session: one(sessions, {
+    fields: [sessionForms.sessionId],
+    references: [sessions.id],
+  }),
+  form: one(formDefinitions, {
+    fields: [sessionForms.formId],
+    references: [formDefinitions.id],
+  }),
 }));
 
 export const registrationsRelations = relations(registrations, ({ one }) => ({
@@ -871,10 +792,6 @@ export const attendanceRelations = relations(attendance, ({ one }) => ({
 export const formDefinitionsRelations = relations(
   formDefinitions,
   ({ one, many }) => ({
-    camp: one(camps, {
-      fields: [formDefinitions.campId],
-      references: [camps.id],
-    }),
     session: one(sessions, {
       fields: [formDefinitions.sessionId],
       references: [sessions.id],
@@ -949,48 +866,9 @@ export const formSubmissionsRelations = relations(
   })
 );
 
-// Multi-tenant Relations
-
-export const organizationsRelations = relations(
-  organizations,
-  ({ many }) => ({
-    organizationUsers: many(organizationUsers),
-    children: many(children),
-    camps: many(camps),
-    sessions: many(sessions),
-    registrations: many(registrations),
-    incidents: many(incidents),
-    documents: many(documents),
-    events: many(events),
-    groups: many(groups),
-    assignments: many(assignments),
-    groupMembers: many(groupMembers),
-    attendance: many(attendance),
-    medicationLogs: many(medicationLogs),
-    aiActions: many(aiActions),
-    formDefinitions: many(formDefinitions),
-    formFields: many(formFields),
-    formOptions: many(formOptions),
-    formSnapshots: many(formSnapshots),
-    formSubmissions: many(formSubmissions),
-    medications: many(medications),
-  })
-);
-
-export const organizationUsersRelations = relations(
-  organizationUsers,
-  ({ one }) => ({
-    organization: one(organizations, {
-      fields: [organizationUsers.organizationId],
-      references: [organizations.id],
-    }),
-    user: one(user, {
-      fields: [organizationUsers.userId],
-      references: [user.id],
-    }),
-    inviter: one(user, {
-      fields: [organizationUsers.invitedBy],
-      references: [user.id],
-    }),
-  })
-);
+export const eventsRelations = relations(events, ({ one }) => ({
+  user: one(user, {
+    fields: [events.userId],
+    references: [user.id],
+  }),
+}));

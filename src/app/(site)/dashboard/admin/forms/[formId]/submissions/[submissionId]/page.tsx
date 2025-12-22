@@ -21,7 +21,7 @@ export default async function SubmissionDetailPage({
     redirect("/dashboard");
   }
 
-  // Fetch submission with all related data
+  // Fetch submission
   const submission = await db.query.formSubmissions.findFirst({
     where: and(
       eq(formSubmissions.id, submissionId),
@@ -44,13 +44,11 @@ export default async function SubmissionDetailPage({
         },
       },
       session: {
-        with: {
-          camp: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
+        columns: {
+          id: true,
+          name: true,
+          startDate: true,
+          endDate: true,
         },
       },
       formDefinition: {
@@ -195,11 +193,11 @@ export default async function SubmissionDetailPage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Calendar className="h-4 w-4" />
-                Camp Session
+                Session
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="font-medium">{submission.session.camp?.name}</p>
+              <p className="font-medium">{submission.session.name}</p>
               <p className="text-sm text-muted-foreground">
                 Starts: {new Date(submission.session.startDate).toLocaleDateString()}
               </p>

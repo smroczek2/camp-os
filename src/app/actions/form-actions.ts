@@ -35,10 +35,6 @@ export async function submitFormAction(data: {
     throw new Error("Unauthorized");
   }
 
-  if (!session.user.activeOrganizationId) {
-    throw new Error("No active organization. Please select an organization.");
-  }
-
   // Check permission
   await enforcePermission(session.user.id, "formSubmission", "create");
 
@@ -81,13 +77,10 @@ export async function submitFormAction(data: {
     }
   }
 
-  return formService.submitForm(
-    {
-      ...data,
-      userId: session.user.id,
-    },
-    session.user.activeOrganizationId
-  );
+  return formService.submitForm({
+    ...data,
+    userId: session.user.id,
+  });
 }
 
 /**
@@ -112,9 +105,9 @@ export async function getFormAction(formId: string) {
 }
 
 /**
- * Get all forms for a camp or session
+ * Get all forms (optionally filtered by session)
  */
-export async function getFormsAction(campId: string, sessionId?: string) {
+export async function getFormsAction(sessionId?: string) {
   const session = await getSession();
   if (!session?.user) {
     throw new Error("Unauthorized");
@@ -123,7 +116,7 @@ export async function getFormsAction(campId: string, sessionId?: string) {
   // Check permission
   await enforcePermission(session.user.id, "form", "read");
 
-  return formService.getFormsByCamp(campId, sessionId);
+  return formService.getForms(sessionId);
 }
 
 /**
@@ -158,7 +151,6 @@ export async function getFormSubmissionsAction(formId: string) {
  */
 export async function generateFormAction(data: {
   prompt: string;
-  campId: string;
   sessionId?: string;
 }): Promise<GeneratedFormResult> {
   const session = await getSession();
@@ -179,16 +171,10 @@ export async function generateFormAction(data: {
     );
   }
 
-  if (!session.user.activeOrganizationId) {
-    throw new Error("No active organization. Please select an organization.");
-  }
-
   // Permission check happens inside createFormGenerationAction
   const result = await createFormGenerationAction(
     session.user.id,
-    session.user.activeOrganizationId,
     data.prompt,
-    data.campId,
     data.sessionId
   );
 
@@ -198,7 +184,6 @@ export async function generateFormAction(data: {
     action: result.action,
     params: result.params as {
       prompt: string;
-      campId: string;
       sessionId?: string;
       generatedForm: AIFormGeneration;
     },
@@ -272,7 +257,6 @@ export async function approveAIFormAction(data: {
   // Parse existing params with proper typing
   const existingParams = aiAction.params as {
     prompt: string;
-    campId: string;
     sessionId?: string;
     generatedForm: unknown;
   };

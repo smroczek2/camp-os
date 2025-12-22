@@ -25,10 +25,10 @@ export default async function FormDetailsPage({
     redirect("/dashboard");
   }
 
+  // Fetch form
   const form = await db.query.formDefinitions.findFirst({
     where: eq(formDefinitions.id, formId),
     with: {
-      camp: true,
       session: true,
       fields: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,20 +3,19 @@ import { WelcomeEmail } from "./templates/welcome-email";
 
 export interface WelcomeEmailParams {
   to: string;
-  organizationName: string;
   adminName: string;
   dashboardUrl: string;
 }
 
 /**
- * Send welcome email to new organization admin
+ * Send welcome email to new admin
  */
 export async function sendWelcomeEmail(params: WelcomeEmailParams) {
   try {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: params.to,
-      subject: `Welcome to Camp OS - ${params.organizationName}`,
+      subject: "Welcome to Camp OS",
       react: WelcomeEmail(params),
     });
 

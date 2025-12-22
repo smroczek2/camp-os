@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { withOrganizationContext } from "@/lib/db/tenant-context";
+import { db } from "@/lib/db";
+import { sessions, registrations } from "@/lib/schema";
+import { sql, desc, eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,62 +23,41 @@ export default async function AdminDashboard() {
     redirect("/login");
   }
 
-  if (!session.user.activeOrganizationId) {
-    redirect("/login");
-  }
+  // Efficient aggregated stats query - single query for all counts
+  const [stats] = await db
+    .select({
+      totalSessions: sql<number>`COUNT(DISTINCT ${sessions.id})`.mapWith(Number),
+      confirmedRegistrations: sql<number>`COUNT(CASE WHEN ${registrations.status} = 'confirmed' THEN 1 END)`.mapWith(Number),
+      pendingRegistrations: sql<number>`COUNT(CASE WHEN ${registrations.status} = 'pending' THEN 1 END)`.mapWith(Number),
+      totalRevenue: sql<number>`COALESCE(SUM(${registrations.amountPaid}::numeric), 0)`.mapWith(Number),
+    })
+    .from(sessions)
+    .leftJoin(registrations, eq(sessions.id, registrations.sessionId));
 
-  const { allCamps, allRegistrations } = await withOrganizationContext(
-    session.user.activeOrganizationId,
-    async (tx) => {
-      // Get all camps and sessions
-      const allCamps = await tx.query.camps.findMany({
-        with: {
-          sessions: {
-            with: {
-              registrations: {
-                with: {
-                  child: true,
-                  user: true,
-                },
-              },
-            },
-          },
-        },
-      });
+  // Recent 5 sessions with registration counts only
+  const recentSessions = await db.query.sessions.findMany({
+    with: {
+      registrations: {
+        columns: { status: true },
+      },
+    },
+    orderBy: [desc(sessions.createdAt)],
+    limit: 5,
+  });
 
-      // Get all registrations
-      const allRegistrations = await tx.query.registrations.findMany({
-        with: {
-          child: true,
-          session: {
-            with: {
-              camp: true,
-            },
-          },
-        },
-      });
-
-      return { allCamps, allRegistrations };
-    }
-  );
-
-  // Calculate stats
-  const totalRevenue = allRegistrations
-    .filter((r) => r.amountPaid)
-    .reduce((sum, r) => sum + parseFloat(r.amountPaid || "0"), 0);
-
-  const confirmedRegistrations = allRegistrations.filter(
-    (r) => r.status === "confirmed"
-  ).length;
-
-  const pendingRegistrations = allRegistrations.filter(
-    (r) => r.status === "pending"
-  ).length;
-
-  const totalSessions = allCamps.reduce(
-    (sum, camp) => sum + camp.sessions.length,
-    0
-  );
+  // Recent 10 registrations with minimal data
+  const recentRegistrations = await db.query.registrations.findMany({
+    with: {
+      child: {
+        columns: { firstName: true, lastName: true },
+      },
+      session: {
+        columns: { name: true, startDate: true, price: true },
+      },
+    },
+    orderBy: [desc(registrations.createdAt)],
+    limit: 10,
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -89,12 +70,32 @@ export default async function AdminDashboard() {
               Welcome, {session.user.name}
             </p>
           </div>
-          <Link href="/dashboard/admin/forms">
-            <Button>
-              <FileText className="h-4 w-4 mr-2" />
-              Form Builder
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/admin/programs">
+              <Button variant="outline">
+                <Calendar className="h-4 w-4 mr-2" />
+                Sessions
+              </Button>
+            </Link>
+            <Link href="/dashboard/admin/attendance">
+              <Button variant="outline">
+                <Users className="h-4 w-4 mr-2" />
+                Attendance
+              </Button>
+            </Link>
+            <Link href="/dashboard/admin/incidents">
+              <Button variant="outline">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                Incidents
+              </Button>
+            </Link>
+            <Link href="/dashboard/admin/forms">
+              <Button>
+                <FileText className="h-4 w-4 mr-2" />
+                Form Builder
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -106,7 +107,7 @@ export default async function AdminDashboard() {
               <Calendar className="h-6 w-6 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{totalSessions}</p>
+              <p className="text-2xl font-bold">{stats.totalSessions}</p>
               <p className="text-sm text-muted-foreground">Total Sessions</p>
             </div>
           </div>
@@ -118,7 +119,7 @@ export default async function AdminDashboard() {
               <Users className="h-6 w-6 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{confirmedRegistrations}</p>
+              <p className="text-2xl font-bold">{stats.confirmedRegistrations}</p>
               <p className="text-sm text-muted-foreground">
                 Confirmed Registrations
               </p>
@@ -132,7 +133,7 @@ export default async function AdminDashboard() {
               <AlertCircle className="h-6 w-6 text-orange-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{pendingRegistrations}</p>
+              <p className="text-2xl font-bold">{stats.pendingRegistrations}</p>
               <p className="text-sm text-muted-foreground">Pending Payments</p>
             </div>
           </div>
@@ -144,120 +145,75 @@ export default async function AdminDashboard() {
               <DollarSign className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">${totalRevenue.toFixed(0)}</p>
+              <p className="text-2xl font-bold">${stats.totalRevenue.toFixed(0)}</p>
               <p className="text-sm text-muted-foreground">Total Revenue</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Camps & Sessions */}
+      {/* Sessions */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Camps & Sessions</h2>
-          {/* TODO: Add "Create Camp" button */}
+          <h2 className="text-2xl font-bold">Sessions</h2>
+          <Link href="/dashboard/admin/programs">
+            <Button variant="outline" size="sm">
+              View All
+            </Button>
+          </Link>
         </div>
 
-        {allCamps.length === 0 ? (
+        {recentSessions.length === 0 ? (
           <div className="text-center p-12 border rounded-xl bg-muted/30">
             <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">No camps created yet</p>
+            <p className="text-muted-foreground">No sessions created yet</p>
+            <Link href="/dashboard/admin/programs" className="mt-4 inline-block">
+              <Button>Create Your First Session</Button>
+            </Link>
           </div>
         ) : (
-          <div className="space-y-6">
-            {allCamps.map((camp) => (
-              <div
-                key={camp.id}
-                className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-xl mb-2">{camp.name}</h3>
-                    {camp.description && (
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {camp.description}
-                      </p>
-                    )}
-                    {camp.location && (
-                      <p className="text-sm text-muted-foreground">
-                        📍 {camp.location}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold">
-                      {camp.sessions.length} sessions
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Capacity: {camp.capacity}
-                    </p>
-                  </div>
-                </div>
+          <div className="space-y-3">
+            {recentSessions.map((campSession) => {
+              const confirmedCount = campSession.registrations.filter(
+                (r) => r.status === "confirmed"
+              ).length;
+              const fillRate = (confirmedCount / campSession.capacity) * 100;
 
-                {/* Sessions */}
-                {camp.sessions.length > 0 && (
-                  <div className="pt-4 border-t">
-                    <p className="font-medium mb-3 flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Sessions
-                    </p>
-                    <div className="space-y-3">
-                      {camp.sessions.map((session) => {
-                        const sessionRegistrations = session.registrations.length;
-                        const confirmedCount = session.registrations.filter(
-                          (r) => r.status === "confirmed"
-                        ).length;
-                        const fillRate =
-                          (confirmedCount / session.capacity) * 100;
-
-                        return (
-                          <div
-                            key={session.id}
-                            className="p-4 border rounded-lg bg-muted/30"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <p className="font-medium">
-                                    {new Date(
-                                      session.startDate
-                                    ).toLocaleDateString()}{" "}
-                                    -{" "}
-                                    {new Date(
-                                      session.endDate
-                                    ).toLocaleDateString()}
-                                  </p>
-                                  <Badge
-                                    variant="outline"
-                                    className="capitalize"
-                                  >
-                                    {session.status}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                  <span>${session.price}</span>
-                                  <span>
-                                    {confirmedCount} / {session.capacity}{" "}
-                                    registered
-                                  </span>
-                                  <span>{fillRate.toFixed(0)}% full</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Activity className="h-4 w-4 text-green-600" />
-                                <span className="text-sm font-medium">
-                                  {sessionRegistrations} total
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+              return (
+                <div
+                  key={campSession.id}
+                  className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="font-semibold text-lg">{campSession.name}</p>
+                        <Badge variant="outline" className="capitalize">
+                          {campSession.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>
+                          {new Date(campSession.startDate).toLocaleDateString()} -{" "}
+                          {new Date(campSession.endDate).toLocaleDateString()}
+                        </span>
+                        <span>${campSession.price}</span>
+                        <span>
+                          {confirmedCount} / {campSession.capacity} registered
+                        </span>
+                        <span>{fillRate.toFixed(0)}% full</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium">
+                        {campSession.registrations.length} total
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -266,14 +222,14 @@ export default async function AdminDashboard() {
       <div>
         <h2 className="text-2xl font-bold mb-6">Recent Registrations</h2>
 
-        {allRegistrations.length === 0 ? (
+        {recentRegistrations.length === 0 ? (
           <div className="text-center p-12 border rounded-xl bg-muted/30">
             <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">No registrations yet</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {allRegistrations.slice(0, 10).map((registration) => (
+            {recentRegistrations.map((registration) => (
               <div
                 key={registration.id}
                 className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow"
@@ -292,10 +248,8 @@ export default async function AdminDashboard() {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {registration.session.camp.name} •{" "}
-                      {new Date(
-                        registration.session.startDate
-                      ).toLocaleDateString()}
+                      {registration.session.name} •{" "}
+                      {new Date(registration.session.startDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="text-right">

@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
-import { provisionOrganization } from "@/lib/provisioning/provision-organization";
 import { onboardingSchema } from "@/types/onboarding";
 import type {
   OnboardingResult,
   OnboardingError,
 } from "@/types/onboarding";
-import { sendWelcomeEmail } from "@/lib/email/send-welcome";
+import { db } from "@/lib/db";
+import { user } from "@/lib/schema";
+import { eq } from "drizzle-orm";
+import { auth } from "@/lib/auth";
 
 /**
  * POST /api/onboarding
  *
- * Self-service organization signup endpoint
+ * Admin account signup endpoint
  *
  * Flow:
  * 1. Validate input with Zod
- * 2. Provision organization (creates org + admin + membership)
- * 3. Send welcome email (async, don't block)
+ * 2. Check if email is already in use
+ * 3. Create user with admin role using Better Auth
  * 4. Return success with redirect URL
- *
- * SIMPLIFIED: No onboarding_sessions table, no retry logic
- * If provisioning fails, user sees error and must retry manually
  */
 export async function POST(request: Request) {
   try {
@@ -27,26 +26,43 @@ export async function POST(request: Request) {
     const body = await request.json();
     const data = onboardingSchema.parse(body);
 
-    // 2. Provision organization (atomic transaction)
-    const result = await provisionOrganization(data);
-
-    // 3. Send welcome email (async, don't block response)
-    sendWelcomeEmail({
-      to: data.email,
-      organizationName: data.organizationName,
-      adminName: `${data.firstName} ${data.lastName}`,
-      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}${result.redirectUrl}`,
-    }).catch((error) => {
-      // Log email error but don't fail the request
-      console.error("Failed to send welcome email:", error);
+    // 2. Check if email is already in use
+    const existingUser = await db.query.user.findFirst({
+      where: eq(user.email, data.email),
     });
+
+    if (existingUser) {
+      const response: OnboardingError = {
+        success: false,
+        error: "An account with this email already exists",
+      };
+      return NextResponse.json(response, { status: 409 });
+    }
+
+    // 3. Create user with admin role using Better Auth
+    const signUpResult = await auth.api.signUpEmail({
+      body: {
+        email: data.email,
+        password: data.password,
+        name: `${data.firstName} ${data.lastName}`,
+      },
+    });
+
+    if (!signUpResult.user) {
+      throw new Error("Failed to create user account");
+    }
+
+    // Update user role to admin
+    await db
+      .update(user)
+      .set({ role: "admin" })
+      .where(eq(user.id, signUpResult.user.id));
 
     // 4. Return success
     const response: OnboardingResult = {
       success: true,
-      organizationId: result.organizationId,
-      userId: result.userId,
-      redirectUrl: result.redirectUrl,
+      userId: signUpResult.user.id,
+      redirectUrl: "/dashboard/admin",
     };
 
     return NextResponse.json(response, { status: 201 });
@@ -59,7 +75,7 @@ export async function POST(request: Request) {
       error:
         error instanceof Error
           ? error.message
-          : "Failed to create organization. Please try again.",
+          : "Failed to create account. Please try again.",
       details: error instanceof Error ? error.message : undefined,
     };
 

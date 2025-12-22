@@ -195,12 +195,3 @@ export function createRateLimitHeaders(result: RateLimitResult): Record<string, 
   };
 }
 
-/**
- * Check if rate limiting is enabled
- */
-export function isRateLimitingEnabled(): boolean {
-  return !!(
-    process.env.REDIS_URL ||
-    (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
-  );
-}

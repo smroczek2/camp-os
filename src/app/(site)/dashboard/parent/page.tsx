@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { withOrganizationContext } from "@/lib/db/tenant-context";
-import { eq, and, inArray } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { eq, and, inArray, or } from "drizzle-orm";
 import {
   children,
   registrations,
   formDefinitions,
   formSubmissions,
+  sessions,
 } from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,9 @@ import { Users, Calendar, AlertCircle, CheckCircle2, FileText, ArrowRight } from
 import Link from "next/link";
 import { AddChildDialog } from "@/components/parent/add-child-dialog";
 import { RegisterSessionDialog } from "@/components/parent/register-session-dialog";
+import { AutoRegisterHandler } from "@/components/parent/auto-register-handler";
 import { formatDate } from "@/lib/utils";
+import { Suspense } from "react";
 
 export default async function ParentDashboard() {
   const session = await getSession();
@@ -23,85 +26,62 @@ export default async function ParentDashboard() {
     redirect("/login");
   }
 
-  if (!session.user.activeOrganizationId) {
-    redirect("/login");
-  }
+  // Get parent's children
+  const myChildren = await db.query.children.findMany({
+    where: eq(children.userId, session.user.id),
+  });
 
-  const {
-    myChildren,
-    myRegistrations,
-    allSessions,
-    availableForms,
-    mySubmissions,
-  } = await withOrganizationContext(
-    session.user.activeOrganizationId,
-    async (tx) => {
-      // Get parent's children
-      const myChildren = await tx.query.children.findMany({
-        where: eq(children.userId, session.user.id),
-      });
+  // Get all registrations for this parent
+  const myRegistrations = await db.query.registrations.findMany({
+    where: eq(registrations.userId, session.user.id),
+    with: {
+      child: true,
+      session: true,
+    },
+  });
 
-      // Get all registrations for this parent
-      const myRegistrations = await tx.query.registrations.findMany({
-        where: eq(registrations.userId, session.user.id),
-        with: {
-          child: true,
-          session: {
-            with: {
-              camp: true,
-            },
+  // Get available sessions for browsing (only open/draft, limited to 50, with registration counts only)
+  const allSessions = await db.query.sessions.findMany({
+    where: or(eq(sessions.status, "open"), eq(sessions.status, "draft")),
+    with: {
+      registrations: {
+        columns: { status: true },
+      },
+    },
+    limit: 50,
+  });
+
+  // Get session IDs for registered sessions
+  const registeredSessionIds = myRegistrations.map((r) => r.sessionId);
+
+  // Get published forms for registered sessions
+  const availableForms =
+    registeredSessionIds.length > 0
+      ? await db.query.formDefinitions.findMany({
+          where: and(
+            eq(formDefinitions.isPublished, true),
+            inArray(formDefinitions.sessionId, registeredSessionIds)
+          ),
+          with: {
+            fields: { columns: { id: true } },
+            session: { columns: { name: true } },
           },
-        },
-      });
+        })
+      : [];
 
-      // Get all available sessions for browsing
-      const allSessions = await tx.query.sessions.findMany({
-        with: {
-          camp: true,
-          registrations: true,
-        },
-      });
-
-      // Get session IDs for registered sessions
-      const registeredSessionIds = myRegistrations.map((r) => r.sessionId);
-
-      // Get published forms for registered sessions
-      const availableForms =
-        registeredSessionIds.length > 0
-          ? await tx.query.formDefinitions.findMany({
-              where: and(
-                eq(formDefinitions.isPublished, true),
-                inArray(formDefinitions.sessionId, registeredSessionIds)
-              ),
-              with: {
-                fields: { columns: { id: true } },
-                session: {
-                  with: {
-                    camp: { columns: { name: true } },
-                  },
-                },
-              },
-            })
-          : [];
-
-      // Get user's form submissions to check what's already completed
-      const mySubmissions = await tx.query.formSubmissions.findMany({
-        where: eq(formSubmissions.userId, session.user.id),
-        columns: { formDefinitionId: true },
-      });
-
-      return {
-        myChildren,
-        myRegistrations,
-        allSessions,
-        availableForms,
-        mySubmissions,
-      };
-    }
-  );
+  // Get user's form submissions to check what's already completed
+  const mySubmissions = await db.query.formSubmissions.findMany({
+    where: eq(formSubmissions.userId, session.user.id),
+    columns: { formDefinitionId: true },
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Auto-register handler for shareable links */}
+      <Suspense fallback={null}>
+        <AutoRegisterHandler sessions={allSessions} childrenList={myChildren} />
+      </Suspense>
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Parent Dashboard</h1>
@@ -206,7 +186,7 @@ export default async function ParentDashboard() {
                       )}
                       <p className="text-sm text-muted-foreground">
                         {form.fields?.length || 0} fields •{" "}
-                        {form.session?.camp?.name ?? "Camp-wide"}
+                        {form.session?.name ?? "General"}
                       </p>
                     </div>
                     <div>
@@ -339,7 +319,7 @@ export default async function ParentDashboard() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-semibold text-lg">
-                        {registration.session.camp.name}
+                        {registration.session.name}
                       </h3>
                       {registration.status === "confirmed" ? (
                         <Badge className="bg-green-500">
@@ -365,15 +345,22 @@ export default async function ParentDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold">${registration.session.price}</p>
-                    {registration.amountPaid && (
+                    {registration.amountPaid ? (
                       <p className="text-sm text-green-600">Paid</p>
-                    )}
+                    ) : registration.status === "pending" ? (
+                      <Link href={`/checkout/${registration.id}`}>
+                        <Button size="sm" className="mt-2">
+                          Pay Now
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
 
-                {registration.session.camp.location && (
+                {registration.session.description && (
                   <p className="text-sm text-muted-foreground">
-                    📍 {registration.session.camp.location}
+                    {registration.session.description}
                   </p>
                 )}
               </div>
@@ -395,30 +382,25 @@ export default async function ParentDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allSessions.map((session) => {
+            {allSessions.map((campSession) => {
               const spotsLeft =
-                session.capacity -
-                session.registrations.filter((r) => r.status === "confirmed")
+                campSession.capacity -
+                campSession.registrations.filter((r) => r.status === "confirmed")
                   .length;
-              const isOpen = session.status === "open";
+              const isOpen = campSession.status === "open";
 
               return (
                 <div
-                  key={session.id}
+                  key={campSession.id}
                   className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-lg transition-all hover:-translate-y-1"
                 >
                   <div className="mb-4">
                     <h3 className="font-semibold text-xl mb-2">
-                      {session.camp.name}
+                      {campSession.name}
                     </h3>
-                    {session.camp.description && (
+                    {campSession.description && (
                       <p className="text-sm text-muted-foreground mb-3">
-                        {session.camp.description}
-                      </p>
-                    )}
-                    {session.camp.location && (
-                      <p className="text-sm text-muted-foreground mb-2">
-                        📍 {session.camp.location}
+                        {campSession.description}
                       </p>
                     )}
                   </div>
@@ -427,13 +409,13 @@ export default async function ParentDashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Dates</span>
                       <span className="font-medium">
-                        {formatDate(session.startDate)} -{" "}
-                        {formatDate(session.endDate)}
+                        {formatDate(campSession.startDate)} -{" "}
+                        {formatDate(campSession.endDate)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Price</span>
-                      <span className="font-bold text-lg">${session.price}</span>
+                      <span className="font-bold text-lg">${campSession.price}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Spots Left</span>
@@ -442,7 +424,7 @@ export default async function ParentDashboard() {
                           spotsLeft < 5 ? "text-orange-600" : "text-green-600"
                         }`}
                       >
-                        {spotsLeft} / {session.capacity}
+                        {spotsLeft} / {campSession.capacity}
                       </span>
                     </div>
                   </div>
@@ -450,14 +432,14 @@ export default async function ParentDashboard() {
                   {isOpen && spotsLeft > 0 ? (
                     <div className="mt-4">
                       <RegisterSessionDialog
-                        session={session}
+                        session={campSession}
                         childrenList={myChildren}
                         disabled={myChildren.length === 0}
                       />
                     </div>
                   ) : !isOpen ? (
                     <Badge variant="outline" className="w-full justify-center mt-4">
-                      {session.status}
+                      {campSession.status}
                     </Badge>
                   ) : (
                     <Badge

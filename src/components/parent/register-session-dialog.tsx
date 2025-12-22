@@ -25,19 +25,17 @@ import { formatDate } from "@/lib/utils";
 import type { children } from "@/lib/schema";
 
 type Child = typeof children.$inferSelect;
-type SessionWithCamp = {
+type SessionForRegistration = {
   id: string;
+  name: string;
   startDate: Date;
   endDate: Date;
   price: string;
   status: string;
-  camp: {
-    name: string;
-  };
 };
 
 interface RegisterSessionDialogProps {
-  session: SessionWithCamp;
+  session: SessionForRegistration;
   childrenList: Child[];
   disabled?: boolean;
 }
@@ -100,7 +98,7 @@ export function RegisterSessionDialog({
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Register for {session.camp.name}</DialogTitle>
+            <DialogTitle>Register for {session.name}</DialogTitle>
             <DialogDescription>
               Select which child you&apos;d like to register for this session.
             </DialogDescription>

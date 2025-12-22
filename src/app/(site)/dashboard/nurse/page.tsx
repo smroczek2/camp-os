@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { withOrganizationContext } from "@/lib/db/tenant-context";
+import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Pill, Activity, Users } from "lucide-react";
 
@@ -11,64 +11,48 @@ export default async function NurseDashboard() {
     redirect("/login");
   }
 
-  if (!session.user.activeOrganizationId) {
-    redirect("/login");
-  }
+  // Get all children with medical information
+  const allChildren = await db.query.children.findMany({
+    with: {
+      medications: true,
+      registrations: {
+        with: {
+          session: true,
+        },
+      },
+    },
+  });
 
-  const { allChildren, recentLogs, recentIncidents } =
-    await withOrganizationContext(
-      session.user.activeOrganizationId,
-      async (tx) => {
-        // Get all children with medical information
-        const allChildren = await tx.query.children.findMany({
-          with: {
-            medications: true,
-            registrations: {
-              with: {
-                session: {
-                  with: {
-                    camp: true,
-                  },
-                },
-              },
-            },
-          },
-        });
+  // Get recent medication logs
+  const recentLogs = await db.query.medicationLogs.findMany({
+    orderBy: (logs, { desc }) => [desc(logs.administeredAt)],
+    limit: 10,
+    with: {
+      child: true,
+      medication: true,
+      administrator: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
 
-        // Get recent medication logs
-        const recentLogs = await tx.query.medicationLogs.findMany({
-          orderBy: (logs, { desc }) => [desc(logs.administeredAt)],
-          limit: 10,
-          with: {
-            child: true,
-            medication: true,
-            administrator: {
-              columns: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        });
-
-        // Get recent incidents
-        const recentIncidents = await tx.query.incidents.findMany({
-          orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
-          limit: 10,
-          with: {
-            child: true,
-            reporter: {
-              columns: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        });
-
-        return { allChildren, recentLogs, recentIncidents };
-      }
-    );
+  // Get recent incidents
+  const recentIncidents = await db.query.incidents.findMany({
+    orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
+    limit: 10,
+    with: {
+      child: true,
+      reporter: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
 
   // Calculate stats
   const childrenWithAllergies = allChildren.filter(

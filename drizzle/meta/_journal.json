@@ -36,6 +36,34 @@
       "when": 1765981486188,
       "tag": "0004_flat_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766079129298,
+      "tag": "0005_sturdy_shriek",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1766080635828,
+      "tag": "0006_first_deadpool",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1766168044111,
+      "tag": "0007_chemical_vivisector",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1766408972216,
+      "tag": "0008_keen_puck",
+      "breakpoints": true
     }
   ]
 }

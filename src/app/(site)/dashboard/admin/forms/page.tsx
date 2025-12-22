@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth-helper";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { formDefinitions, camps, sessions, formFields, formSubmissions } from "@/lib/schema";
+import { formDefinitions, sessions, formFields, formSubmissions } from "@/lib/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,11 +22,10 @@ export default async function FormsPage() {
     redirect("/dashboard");
   }
 
-  // Fetch all forms with aggregated counts (optimized query)
+  // Fetch forms
   const forms = await db
     .select({
       id: formDefinitions.id,
-      campId: formDefinitions.campId,
       sessionId: formDefinitions.sessionId,
       createdBy: formDefinitions.createdBy,
       name: formDefinitions.name,
@@ -39,20 +38,19 @@ export default async function FormsPage() {
       aiActionId: formDefinitions.aiActionId,
       createdAt: formDefinitions.createdAt,
       updatedAt: formDefinitions.updatedAt,
-      campName: camps.name,
+      sessionName: sessions.name,
       sessionStartDate: sessions.startDate,
       fieldCount: sql<number>`COUNT(DISTINCT ${formFields.id})`.as("field_count"),
       submissionCount: sql<number>`COUNT(DISTINCT ${formSubmissions.id})`.as("submission_count"),
     })
     .from(formDefinitions)
-    .leftJoin(camps, eq(formDefinitions.campId, camps.id))
     .leftJoin(sessions, eq(formDefinitions.sessionId, sessions.id))
     .leftJoin(formFields, eq(formFields.formDefinitionId, formDefinitions.id))
     .leftJoin(formSubmissions, eq(formSubmissions.formDefinitionId, formDefinitions.id))
     .groupBy(
       formDefinitions.id,
-      camps.name,
       sessions.id,
+      sessions.name,
       sessions.startDate
     )
     .orderBy(desc(formDefinitions.createdAt));
@@ -132,7 +130,7 @@ export default async function FormsPage() {
               <div className="space-y-2 text-sm">
                 <p className="text-muted-foreground">
                   {form.fieldCount || 0} fields •{" "}
-                  {form.campName ?? "Unknown"}
+                  {form.sessionName ?? "Camp-wide"}
                 </p>
                 {form.submissionCount > 0 && (
                   <p className="text-muted-foreground">

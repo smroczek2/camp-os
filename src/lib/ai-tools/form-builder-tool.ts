@@ -102,7 +102,6 @@ export const aiFormGenerationSchema = z.object({
  */
 export async function generateFormFromPrompt(
   prompt: string,
-  campId: string,
   sessionId?: string
 ): Promise<AIFormGeneration> {
   const systemPrompt = `You are an expert form designer for a camp management system.
@@ -111,7 +110,7 @@ Generate a structured form definition based on the user's requirements.
 Guidelines:
 - Use clear, descriptive field names
 - fieldKey must be snake_case (e.g., "child_name", "t_shirt_size")
-- NEVER create fields for internal IDs or scope (campId/camp_id, sessionId/session_id, registrationId, childId, userId). Parents should never be asked to choose these.
+- NEVER create fields for internal IDs or scope (sessionId/session_id, registrationId, childId, userId). Parents should never be asked to choose these.
 - Add validation rules where appropriate
 - Use conditional logic to show/hide fields based on previous answers
 - For nested options (e.g., "Select Activity" with sub-activities), use triggersFields
@@ -130,7 +129,7 @@ Should generate:
     model: openai(process.env.OPENAI_MODEL || "gpt-4o"),
     schema: aiFormGenerationSchema,
     system: systemPrompt,
-    prompt: `Camp ID: ${campId}${sessionId ? `, Session ID: ${sessionId}` : ""}
+    prompt: `${sessionId ? `Session ID: ${sessionId}` : ""}
 
 User Request: ${prompt}
 
@@ -177,9 +176,7 @@ export function buildFormPreview(generatedForm: AIFormGeneration) {
  */
 export async function createFormGenerationAction(
   userId: string,
-  organizationId: string,
   prompt: string,
-  campId: string,
   sessionId?: string
 ) {
   // Enforce permission - only admins can create forms
@@ -187,7 +184,7 @@ export async function createFormGenerationAction(
 
   // Generate form structure using AI
   const generatedForm = sanitizeGeneratedForm(
-    await generateFormFromPrompt(prompt, campId, sessionId)
+    await generateFormFromPrompt(prompt, sessionId)
   );
 
   const preview = buildFormPreview(generatedForm);
@@ -196,12 +193,10 @@ export async function createFormGenerationAction(
     const [aiAction] = await tx
       .insert(aiActions)
       .values({
-        organizationId,
         userId,
         action: "createForm",
         params: {
           prompt,
-          campId,
           sessionId,
           generatedForm,
         },
@@ -211,12 +206,10 @@ export async function createFormGenerationAction(
       .returning();
 
     await tx.insert(events).values({
-      organizationId,
       streamId: `ai-action-${aiAction.id}`,
       eventType: "AIFormGenerationRequested",
       eventData: {
         aiActionId: aiAction.id,
-        campId,
         sessionId,
         prompt,
       },
@@ -228,18 +221,3 @@ export async function createFormGenerationAction(
   });
 }
 
-/**
- * Get pending AI form generation actions for approval
- */
-export async function getPendingFormGenerations() {
-  return db.query.aiActions.findMany({
-    where: (aiActions, { eq, and }) =>
-      and(eq(aiActions.action, "createForm"), eq(aiActions.status, "pending")),
-    with: {
-      user: {
-        columns: { id: true, name: true, email: true },
-      },
-    },
-    orderBy: (aiActions, { desc }) => [desc(aiActions.createdAt)],
-  });
-}

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-helper";
-import { withOrganizationContext } from "@/lib/db/tenant-context";
+import { db } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { assignments } from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
@@ -13,35 +13,22 @@ export default async function StaffDashboard() {
     redirect("/login");
   }
 
-  if (!session.user.activeOrganizationId) {
-    redirect("/login");
-  }
-
-  const myAssignments = await withOrganizationContext(
-    session.user.activeOrganizationId,
-    async (tx) => {
-      // Get staff assignments
-      return tx.query.assignments.findMany({
-        where: eq(assignments.staffId, session.user.id),
+  // Get staff assignments
+  const myAssignments = await db.query.assignments.findMany({
+    where: eq(assignments.staffId, session.user.id),
+    with: {
+      group: {
         with: {
-          group: {
+          members: {
             with: {
-              members: {
-                with: {
-                  child: true,
-                },
-              },
-            },
-          },
-          session: {
-            with: {
-              camp: true,
+              child: true,
             },
           },
         },
-      });
-    }
-  );
+      },
+      session: true,
+    },
+  });
 
   const totalChildren = myAssignments.reduce(
     (sum, assignment) => sum + assignment.group.members.length,
@@ -131,9 +118,6 @@ export default async function StaffDashboard() {
                       </Badge>
                       <Badge variant="outline">{assignment.group.type}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {assignment.session.camp.name}
-                    </p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(
                         assignment.session.startDate

@@ -12,7 +12,6 @@ import {
 import type { WelcomeEmailParams } from "../send-welcome";
 
 export function WelcomeEmail({
-  organizationName,
   adminName,
   dashboardUrl,
 }: WelcomeEmailParams) {
@@ -20,7 +19,7 @@ export function WelcomeEmail({
     <Html>
       <Head />
       <Preview>
-        Welcome to Camp OS - Your organization {organizationName} is ready!
+        Welcome to Camp OS - Your camp management system is ready!
       </Preview>
       <Body style={main}>
         <Container style={container}>
@@ -31,8 +30,7 @@ export function WelcomeEmail({
           </Text>
 
           <Text style={text}>
-            Your organization <strong>{organizationName}</strong> has been
-            successfully created and is ready to use.
+            Your account has been successfully created and is ready to use.
           </Text>
 
           <Text style={text}>

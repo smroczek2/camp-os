@@ -231,7 +231,7 @@ export default async function FormSubmissionsPage({
                       <TableCell>
                         {submission.session ? (
                           <div>
-                            <p className="text-sm">{submission.session.camp?.name}</p>
+                            <p className="text-sm">{submission.session.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {new Date(submission.session.startDate).toLocaleDateString()}
                             </p>

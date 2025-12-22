@@ -2,20 +2,20 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 
-/**
- * Check if an email domain should get super_admin role
- * Camp OS employees (campminder.com) are automatically super admins
- */
-function isSuperAdminEmail(email: string): boolean {
-  const superAdminDomains = ["campminder.com"];
-  const domain = email.split("@")[1]?.toLowerCase();
-  return superAdminDomains.includes(domain);
-}
+// Get base URL - prioritize NEXT_PUBLIC_APP_URL so client and server match
+const getBaseURL = (): string => {
+  return process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "http://localhost:3000";
+};
 
 export const auth = betterAuth({
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: getBaseURL(),
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
+  emailAndPassword: {
+    enabled: true,
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
@@ -29,30 +29,6 @@ export const auth = betterAuth({
         required: true,
         defaultValue: "parent",
         input: false, // Don't allow users to set this directly
-      },
-      activeOrganizationId: {
-        type: "string",
-        required: false,
-        input: false, // Set via server action, not user input
-      },
-    },
-  },
-  // Hooks to customize user creation
-  databaseHooks: {
-    user: {
-      create: {
-        before: async (user) => {
-          // Auto-assign super_admin role to campminder.com emails
-          if (user.email && isSuperAdminEmail(user.email)) {
-            return {
-              data: {
-                ...user,
-                role: "super_admin",
-              },
-            };
-          }
-          return { data: user };
-        },
       },
     },
   },

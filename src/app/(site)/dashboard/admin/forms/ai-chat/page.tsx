@@ -43,11 +43,9 @@ const ALL_SESSIONS_VALUE = "__all_sessions__";
 
 export default function AIFormChat() {
   const router = useRouter();
-  const [camps, setCamps] = useState<Array<{ id: string; name: string }>>([]);
   const [sessions, setSessions] = useState<
-    Array<{ id: string; campId: string; startDate: Date }>
+    Array<{ id: string; name: string; startDate: Date }>
   >([]);
-  const [selectedCamp, setSelectedCamp] = useState<string | undefined>();
   const [selectedSession, setSelectedSession] =
     useState<string>(ALL_SESSIONS_VALUE);
 
@@ -55,7 +53,7 @@ export default function AIFormChat() {
     {
       role: "assistant",
       content:
-        "Hi! I'll help you create a custom form. First, select a camp. Optionally choose a specific session (or keep \"All sessions\"). Then describe what information you need to collect.",
+        "Hi! I'll help you create a custom form. Optionally choose a specific session (or keep \"Organization-wide\" for a general form). Then describe what information you need to collect.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -65,32 +63,19 @@ export default function AIFormChat() {
   const [draft, setDraft] = useState<AIFormGeneration | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Fetch camps and sessions
+  // Fetch sessions
   useEffect(() => {
     async function fetchData() {
       try {
-        const response = await fetch("/api/camps");
+        const response = await fetch("/api/sessions");
         const data = await response.json();
-        setCamps(data.camps || []);
         setSessions(data.sessions || []);
       } catch (error) {
-        console.error("Failed to fetch camps:", error);
+        console.error("Failed to fetch sessions:", error);
       }
     }
     fetchData();
   }, []);
-
-  // Default to first camp once loaded
-  useEffect(() => {
-    if (!selectedCamp && camps.length > 0) {
-      setSelectedCamp(camps[0].id);
-      setSelectedSession(ALL_SESSIONS_VALUE);
-    }
-  }, [camps, selectedCamp]);
-
-  const filteredSessions = selectedCamp
-    ? sessions.filter((s) => s.campId === selectedCamp)
-    : [];
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -101,14 +86,9 @@ export default function AIFormChat() {
     setLoading(true);
 
     try {
-      if (!selectedCamp) {
-        throw new Error("Please select a camp first.");
-      }
-
       // Call AI form generation
       const result = await generateFormAction({
         prompt: userMessage,
-        campId: selectedCamp,
         sessionId:
           selectedSession === ALL_SESSIONS_VALUE ? undefined : selectedSession,
       });
@@ -187,61 +167,36 @@ export default function AIFormChat() {
           </p>
         </div>
 
-        {/* Camp/Session Selector */}
+        {/* Session Selector */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-base">Form Scope (Optional)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="camp-select">Camp</Label>
-                <Select
-                  value={selectedCamp}
-                  onValueChange={(value) => {
-                    setSelectedCamp(value);
-                    setSelectedSession(ALL_SESSIONS_VALUE);
-                  }}
-                  disabled={camps.length === 0}
-                >
-                  <SelectTrigger id="camp-select">
-                    <SelectValue placeholder="Select a camp" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {camps.map((camp) => (
-                      <SelectItem key={camp.id} value={camp.id}>
-                        {camp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="session-select">Session</Label>
-                <Select
-                  value={selectedSession}
-                  onValueChange={setSelectedSession}
-                  disabled={!selectedCamp}
-                >
-                  <SelectTrigger id="session-select">
-                    <SelectValue placeholder="All sessions in camp" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_SESSIONS_VALUE}>
-                      All sessions
+            <div className="max-w-md">
+              <Label htmlFor="session-select">Session</Label>
+              <Select
+                value={selectedSession}
+                onValueChange={setSelectedSession}
+              >
+                <SelectTrigger id="session-select">
+                  <SelectValue placeholder="Organization-wide form" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_SESSIONS_VALUE}>
+                    Organization-wide
+                  </SelectItem>
+                  {sessions.map((session) => (
+                    <SelectItem key={session.id} value={session.id}>
+                      {session.name} ({new Date(session.startDate).toLocaleDateString()})
                     </SelectItem>
-                    {filteredSessions.map((session) => (
-                      <SelectItem key={session.id} value={session.id}>
-                        {new Date(session.startDate).toLocaleDateString()}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                Pick a session to target it, or keep &quot;Organization-wide&quot; for a general form
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Pick a session to target it, or keep “All sessions” for camp-wide
-            </p>
           </CardContent>
         </Card>
 

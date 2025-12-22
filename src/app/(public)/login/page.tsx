@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tent } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { EmailSignInForm } from "@/components/auth/email-sign-in-form";
 import { getSession } from "@/lib/auth-helper";
 
 export const metadata = {
@@ -37,7 +38,7 @@ export default async function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <GoogleSignInButton />
+          <EmailSignInForm />
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -45,16 +46,18 @@ export default async function LoginPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or
+                Or continue with
               </span>
             </div>
           </div>
 
-          <div className="text-center text-sm">
+          <GoogleSignInButton />
+
+          <div className="text-center text-sm pt-2">
             <p className="text-muted-foreground">
-              Don&apos;t have an account?{" "}
+              Camp administrator?{" "}
               <Link href="/signup" className="text-blue-600 hover:underline font-medium">
-                Create your camp
+                Set up your camp here
               </Link>
             </p>
           </div>

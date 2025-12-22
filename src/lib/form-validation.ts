@@ -94,7 +94,6 @@ export const createFormSubmissionSchema = z.object({
 
 // Form definition creation schema
 export const createFormDefinitionSchema = z.object({
-  campId: z.string().uuid(),
   sessionId: z.string().uuid().optional(),
   name: z.string().min(1),
   description: z.string().optional(),

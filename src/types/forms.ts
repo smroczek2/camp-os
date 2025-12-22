@@ -96,7 +96,6 @@ export type GeneratedFormResult = {
   action: string;
   params: {
     prompt: string;
-    campId: string;
     sessionId?: string;
     generatedForm: AIFormGeneration;
   };
@@ -139,7 +138,6 @@ export type FormDetails = {
   status: FormStatus;
   isPublished: boolean;
   aiActionId: string | null;
-  camp?: { name: string } | null;
   session?: { startDate: Date } | null;
   fields?: FormFieldDetails[] | null;
   submissions?: Array<{ id: string }> | null;

@@ -28,22 +28,3 @@ export async function getUserWithRole() {
 
   return session.user;
 }
-
-/**
- * Check if user has super_admin role
- */
-export async function isSuperAdmin() {
-  const user = await getUserWithRole();
-  return user?.role === "super_admin";
-}
-
-/**
- * Require authentication - throws redirect if not authenticated
- */
-export async function requireAuth() {
-  const session = await getSession();
-  if (!session?.user) {
-    throw new Error("Unauthorized");
-  }
-  return session;
-}

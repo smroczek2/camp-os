@@ -52,6 +52,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
     staff: ["read", "update"],
     form: ["create", "read", "update", "delete"],
     formSubmission: ["read", "update", "delete"],
+    user: ["create", "read", "update", "delete"],
   },
 };
 
