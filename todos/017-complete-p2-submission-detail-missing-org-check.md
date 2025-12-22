@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: complete
 priority: p2
 issue_id: "017"
 tags: [security, multi-tenant, forms, submissions, authorization]

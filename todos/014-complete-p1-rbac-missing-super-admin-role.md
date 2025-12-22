@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: complete
 priority: p1
 issue_id: "014"
 tags: [security, rbac, roles, authorization, critical]

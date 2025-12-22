@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: complete
 priority: p1
 issue_id: "011"
 tags: [security, multi-tenant, data-leakage, forms, critical]

@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: complete
 priority: p1
 issue_id: "012"
 tags: [security, multi-tenant, authorization, layout, critical]
