@@ -13,6 +13,7 @@ import {
   Activity,
   AlertCircle,
   FileText,
+  UserCircle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -54,6 +55,9 @@ export default async function AdminDashboard() {
       session: {
         columns: { name: true, startDate: true, price: true },
       },
+      user: {
+        columns: { id: true, name: true, email: true },
+      },
     },
     orderBy: [desc(registrations.createdAt)],
     limit: 10,
@@ -71,6 +75,12 @@ export default async function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/dashboard/admin/accounts">
+              <Button variant="outline">
+                <UserCircle className="h-4 w-4 mr-2" />
+                Accounts
+              </Button>
+            </Link>
             <Link href="/dashboard/admin/programs">
               <Button variant="outline">
                 <Calendar className="h-4 w-4 mr-2" />
@@ -230,38 +240,44 @@ export default async function AdminDashboard() {
         ) : (
           <div className="space-y-3">
             {recentRegistrations.map((registration) => (
-              <div
+              <Link
                 key={registration.id}
-                className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow"
+                href={`/dashboard/admin/accounts/${registration.user.id}`}
+                className="block"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium">
-                        {registration.child.firstName}{" "}
-                        {registration.child.lastName}
+                <div className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium">
+                          {registration.child.firstName}{" "}
+                          {registration.child.lastName}
+                        </p>
+                        {registration.status === "confirmed" ? (
+                          <Badge className="bg-green-500">Confirmed</Badge>
+                        ) : (
+                          <Badge variant="outline">{registration.status}</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {registration.session.name} •{" "}
+                        {new Date(registration.session.startDate).toLocaleDateString()}
                       </p>
-                      {registration.status === "confirmed" ? (
-                        <Badge className="bg-green-500">Confirmed</Badge>
-                      ) : (
-                        <Badge variant="outline">{registration.status}</Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Parent: {registration.user.name}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lg">
+                        ${registration.session.price}
+                      </p>
+                      {registration.amountPaid && (
+                        <p className="text-sm text-green-600">Paid</p>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {registration.session.name} •{" "}
-                      {new Date(registration.session.startDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">
-                      ${registration.session.price}
-                    </p>
-                    {registration.amountPaid && (
-                      <p className="text-sm text-green-600">Paid</p>
-                    )}
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

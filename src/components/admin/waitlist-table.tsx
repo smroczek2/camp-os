@@ -9,8 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ListOrdered } from "lucide-react";
+import { ListOrdered, UserCircle } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import Link from "next/link";
 
 interface WaitlistEntry {
   id: string;
@@ -109,7 +110,13 @@ export function WaitlistTable({ waitlist }: WaitlistTableProps) {
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="font-medium">{entry.user.name}</p>
+                    <Link
+                      href={`/dashboard/admin/accounts/${entry.user.id}`}
+                      className="font-medium hover:text-primary transition-colors flex items-center gap-1 group"
+                    >
+                      {entry.user.name}
+                      <UserCircle className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
                     <p className="text-sm text-muted-foreground">{entry.user.email}</p>
                   </div>
                 </TableCell>

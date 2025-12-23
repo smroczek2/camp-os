@@ -18,7 +18,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Users, MoreHorizontal, Mail, CheckCircle2, Clock, Download, Loader2 } from "lucide-react";
+import { Users, MoreHorizontal, Mail, CheckCircle2, Clock, Download, Loader2, UserCircle } from "lucide-react";
+import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { updateRegistrationStatusAction } from "@/app/actions/session-actions";
 
@@ -169,7 +170,13 @@ export function RegistrationList({
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="font-medium">{registration.user.name}</p>
+                    <Link
+                      href={`/dashboard/admin/accounts/${registration.user.id}`}
+                      className="font-medium hover:text-primary transition-colors flex items-center gap-1 group"
+                    >
+                      {registration.user.name}
+                      <UserCircle className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
                     <a
                       href={"mailto:" + registration.user.email}
                       className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
@@ -237,6 +244,12 @@ export function RegistrationList({
                           Cancel Registration
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/admin/accounts/${registration.user.id}`}>
+                          <UserCircle className="h-4 w-4 mr-2" />
+                          View Account
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => window.open("mailto:" + registration.user.email)}
                       >

@@ -21,6 +21,9 @@ export const user = pgTable("user", {
   emailVerified: boolean("emailVerified"),
   image: text("image"),
   role: text("role").notNull().default("parent"), // parent, staff, admin, nurse
+  accountNumber: text("account_number").unique(), // e.g., "A-000001", "A-000234"
+  accountStatus: text("account_status").notNull().default("active"), // "active", "inactive"
+  internalNotes: text("internal_notes"), // Quick staff notes (supplement to accountNotes table)
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
@@ -645,6 +648,108 @@ export const formSubmissions = pgTable(
   })
 );
 
+// Account Management tables
+
+export const accountNotes = pgTable(
+  "account_notes",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    note: text("note").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index("account_notes_account_idx").on(table.accountId),
+    createdAtIdx: index("account_notes_created_at_idx").on(table.createdAt),
+  })
+);
+
+export const accountContacts = pgTable(
+  "account_contacts",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    relationship: text("relationship").notNull(), // "primary", "spouse", "guardian", "billing"
+    phone: text("phone").notNull(),
+    email: text("email"),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    receivesBilling: boolean("receives_billing").notNull().default(false),
+    receivesUpdates: boolean("receives_updates").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index("account_contacts_account_idx").on(table.accountId),
+    primaryIdx: index("account_contacts_primary_idx").on(
+      table.accountId,
+      table.isPrimary
+    ),
+  })
+);
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(), // in cents
+    paymentMethod: text("payment_method").notNull(), // "cash", "check", "card", "stripe"
+    referenceNumber: text("reference_number"), // Check number, last 4 digits, etc.
+    description: text("description"),
+    status: text("status").notNull().default("completed"), // "completed", "pending", "failed", "refunded"
+    refundedAmount: integer("refunded_amount").default(0), // in cents
+    refundReason: text("refund_reason"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"), // For future Stripe integration
+    processedBy: text("processed_by")
+      .notNull()
+      .references(() => user.id),
+    processedAt: timestamp("processed_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index("payments_account_idx").on(table.accountId),
+    statusIdx: index("payments_status_idx").on(table.status),
+    processedAtIdx: index("payments_processed_at_idx").on(table.processedAt),
+  })
+);
+
+export const charges = pgTable(
+  "charges",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    registrationId: uuid("registration_id").references(() => registrations.id, {
+      onDelete: "set null",
+    }),
+    amount: integer("amount").notNull(), // in cents
+    description: text("description").notNull(),
+    chargeType: text("charge_type").notNull(), // "registration", "late_fee", "equipment", "field_trip", "misc"
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index("charges_account_idx").on(table.accountId),
+    registrationIdx: index("charges_registration_idx").on(table.registrationId),
+    createdAtIdx: index("charges_created_at_idx").on(table.createdAt),
+  })
+);
+
 // Relations (for Drizzle ORM type-safe queries)
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -655,6 +760,13 @@ export const userRelations = relations(user, ({ many }) => ({
   reportedIncidents: many(incidents),
   assignments: many(assignments),
   aiActions: many(aiActions),
+  accountNotes: many(accountNotes),
+  accountContacts: many(accountContacts),
+  payments: many(payments),
+  charges: many(charges),
+  createdNotes: many(accountNotes, { relationName: "createdNotes" }),
+  processedPayments: many(payments, { relationName: "processedPayments" }),
+  createdCharges: many(charges, { relationName: "createdCharges" }),
 }));
 
 export const childrenRelations = relations(children, ({ one, many }) => ({
@@ -701,7 +813,7 @@ export const sessionFormsRelations = relations(sessionForms, ({ one }) => ({
   }),
 }));
 
-export const registrationsRelations = relations(registrations, ({ one }) => ({
+export const registrationsRelations = relations(registrations, ({ one, many }) => ({
   user: one(user, {
     fields: [registrations.userId],
     references: [user.id],
@@ -714,6 +826,7 @@ export const registrationsRelations = relations(registrations, ({ one }) => ({
     fields: [registrations.sessionId],
     references: [sessions.id],
   }),
+  charges: many(charges),
 }));
 
 export const waitlistRelations = relations(waitlist, ({ one }) => ({
@@ -924,5 +1037,54 @@ export const eventsRelations = relations(events, ({ one }) => ({
   user: one(user, {
     fields: [events.userId],
     references: [user.id],
+  }),
+}));
+
+// Account Management Relations
+
+export const accountNotesRelations = relations(accountNotes, ({ one }) => ({
+  account: one(user, {
+    fields: [accountNotes.accountId],
+    references: [user.id],
+  }),
+  creator: one(user, {
+    fields: [accountNotes.createdBy],
+    references: [user.id],
+    relationName: "createdNotes",
+  }),
+}));
+
+export const accountContactsRelations = relations(accountContacts, ({ one }) => ({
+  account: one(user, {
+    fields: [accountContacts.accountId],
+    references: [user.id],
+  }),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  account: one(user, {
+    fields: [payments.accountId],
+    references: [user.id],
+  }),
+  processor: one(user, {
+    fields: [payments.processedBy],
+    references: [user.id],
+    relationName: "processedPayments",
+  }),
+}));
+
+export const chargesRelations = relations(charges, ({ one }) => ({
+  account: one(user, {
+    fields: [charges.accountId],
+    references: [user.id],
+  }),
+  registration: one(registrations, {
+    fields: [charges.registrationId],
+    references: [registrations.id],
+  }),
+  creator: one(user, {
+    fields: [charges.createdBy],
+    references: [user.id],
+    relationName: "createdCharges",
   }),
 }));
