@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { getDashboardNavItems, type DashboardRole } from "./dashboard-nav";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -15,36 +16,53 @@ export function DashboardSidebar({ className, role }: SidebarProps) {
   const pathname = usePathname();
   const items = getDashboardNavItems(role);
 
-    return (
-      <div className={cn("pb-12 h-full", className)}>
-        <div className="space-y-4 py-4">
-          <div className="px-3 py-2">
-            <div className="space-y-1">
-              <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-muted-foreground uppercase">
-                Navigation
-              </h2>
-              <nav className="space-y-1">
-                {items.map((item) => {
-                  const isActive = item.matchExact
-                    ? pathname === item.href
-                    : pathname?.startsWith(item.href);
+  const grouped = items.reduce<Record<string, typeof items>>((acc, item) => {
+    const section = item.section || "Navigation";
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(item);
+    return acc;
+  }, {});
 
-                  return (
-                    <Link key={item.href} href={item.href}>
-                      <Button
-                        variant={isActive ? "secondary" : "ghost"}
-                        className="w-full justify-start"
-                      >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        {item.title}
-                      </Button>
+  return (
+    <div className={cn("h-full py-6", className)}>
+      <div className="space-y-6">
+        {Object.entries(grouped).map(([section, sectionItems]) => (
+          <div key={section} className="px-3">
+            <h2 className="mb-2 px-2 text-xs font-semibold tracking-tight text-muted-foreground uppercase">
+              {section}
+            </h2>
+            <nav className="space-y-1">
+              {sectionItems.map((item) => {
+                const isActive = item.matchExact
+                  ? pathname === item.href
+                  : pathname?.startsWith(item.href);
+
+                return (
+                  <Button
+                    key={item.href}
+                    asChild
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start",
+                      isActive && "bg-secondary font-medium"
+                    )}
+                  >
+                    <Link href={item.href}>
+                      <item.icon className="mr-3 h-4 w-4" />
+                      <span className="flex-1 text-left">{item.title}</span>
+                      {item.badge && (
+                        <Badge variant="secondary" className="text-xs">
+                          {item.badge}
+                        </Badge>
+                      )}
                     </Link>
-                  );
-                })}
-              </nav>
-            </div>
+                  </Button>
+                );
+              })}
+            </nav>
           </div>
-        </div>
+        ))}
       </div>
-    );
+    </div>
+  );
 }

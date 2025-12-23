@@ -75,36 +75,36 @@ export default async function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard/admin/accounts">
-              <Button variant="outline">
+            <Button asChild variant="outline">
+              <Link href="/dashboard/admin/accounts">
                 <UserCircle className="h-4 w-4 mr-2" />
                 Accounts
-              </Button>
-            </Link>
-            <Link href="/dashboard/admin/programs">
-              <Button variant="outline">
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/admin/programs">
                 <Calendar className="h-4 w-4 mr-2" />
                 Sessions
-              </Button>
-            </Link>
-            <Link href="/dashboard/admin/attendance">
-              <Button variant="outline">
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/admin/attendance">
                 <Users className="h-4 w-4 mr-2" />
                 Attendance
-              </Button>
-            </Link>
-            <Link href="/dashboard/admin/incidents">
-              <Button variant="outline">
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/admin/incidents">
                 <AlertCircle className="h-4 w-4 mr-2" />
                 Incidents
-              </Button>
-            </Link>
-            <Link href="/dashboard/admin/forms">
-              <Button>
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard/admin/forms">
                 <FileText className="h-4 w-4 mr-2" />
                 Form Builder
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
