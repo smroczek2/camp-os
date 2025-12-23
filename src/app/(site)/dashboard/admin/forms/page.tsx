@@ -4,10 +4,12 @@ import { db } from "@/lib/db";
 import { formDefinitions, sessions, formFields, formSubmissions } from "@/lib/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Sparkles, FileEdit } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { FormsListClient } from "@/components/admin/forms-list-client";
+import { Toaster } from "sonner";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export default async function FormsPage() {
   const session = await getSession();
@@ -57,6 +59,16 @@ export default async function FormsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Toaster position="top-right" />
+
+      {/* Breadcrumb */}
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Form Builder" },
+        ]}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -109,49 +121,8 @@ export default async function FormsPage() {
         </Card>
       </div>
 
-      {/* Forms Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {forms.map((form) => (
-          <Card key={form.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <CardTitle className="text-lg mb-2">{form.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {form.description || "No description"}
-                  </p>
-                </div>
-                <Badge variant={form.isPublished ? "default" : "outline"}>
-                  {form.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <p className="text-muted-foreground">
-                  {form.fieldCount || 0} fields •{" "}
-                  {form.sessionName ?? "Camp-wide"}
-                </p>
-                {form.submissionCount > 0 && (
-                  <p className="text-muted-foreground">
-                    {form.submissionCount} submissions
-                  </p>
-                )}
-                <div className="flex gap-2 mt-4">
-                  <Link href={`/dashboard/admin/forms/${form.id}`}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <FileEdit className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {forms.length === 0 && (
+      {/* Forms List with Client-side Filters and Bulk Actions */}
+      {forms.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-4">
             No forms created yet. Get started with AI!
@@ -163,6 +134,8 @@ export default async function FormsPage() {
             </Button>
           </Link>
         </div>
+      ) : (
+        <FormsListClient forms={forms} />
       )}
     </div>
   );

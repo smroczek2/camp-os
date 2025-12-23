@@ -293,6 +293,12 @@ export async function getMedicationScheduleAction(data: GetMedicationScheduleInp
 
   const targetDate = validatedData.date || new Date();
 
+  // Create start/end of day dates without mutating targetDate
+  const startOfDay = new Date(targetDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(targetDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
   // Build query conditions
   let query = db.query.medications.findMany({
     where: and(
@@ -319,8 +325,8 @@ export async function getMedicationScheduleAction(data: GetMedicationScheduleInp
       },
       logs: {
         where: and(
-          gte(medicationLogs.administeredAt, new Date(targetDate.setHours(0, 0, 0, 0))),
-          lte(medicationLogs.administeredAt, new Date(targetDate.setHours(23, 59, 59, 999)))
+          gte(medicationLogs.administeredAt, startOfDay),
+          lte(medicationLogs.administeredAt, endOfDay)
         ),
         orderBy: desc(medicationLogs.administeredAt),
       },
@@ -366,8 +372,8 @@ export async function getMedicationScheduleAction(data: GetMedicationScheduleInp
         },
         logs: {
           where: and(
-            gte(medicationLogs.administeredAt, new Date(targetDate.setHours(0, 0, 0, 0))),
-            lte(medicationLogs.administeredAt, new Date(targetDate.setHours(23, 59, 59, 999)))
+            gte(medicationLogs.administeredAt, startOfDay),
+            lte(medicationLogs.administeredAt, endOfDay)
           ),
           orderBy: desc(medicationLogs.administeredAt),
         },

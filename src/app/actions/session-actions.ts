@@ -354,3 +354,99 @@ export async function updateRegistrationStatusAction(
     return { success: false, error: "Failed to update registration status" };
   }
 }
+
+/**
+ * Clone session with forms - duplicates session and copies associated form definitions
+ */
+const cloneSessionSchema = z.object({
+  sessionId: z.string().uuid("Invalid session ID"),
+  newStartDate: z.coerce.date().optional(),
+  newName: z.string().optional(),
+});
+
+export async function cloneSessionAction(data: z.infer<typeof cloneSessionSchema>) {
+  const session = await getSession();
+
+  if (!session?.user || session.user.role !== "admin") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const parsed = cloneSessionSchema.safeParse(data);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+
+  try {
+    const original = await db.query.sessions.findFirst({
+      where: eq(sessions.id, parsed.data.sessionId),
+      with: {
+        sessionForms: {
+          with: {
+            form: true,
+          },
+        },
+      },
+    });
+
+    if (!original) {
+      return { success: false, error: "Session not found" };
+    }
+
+    // Calculate new dates - default to next year
+    const originalStart = new Date(original.startDate);
+    const originalEnd = new Date(original.endDate);
+    const nextYearStart = new Date(originalStart);
+    nextYearStart.setFullYear(nextYearStart.getFullYear() + 1);
+    const duration = originalEnd.getTime() - originalStart.getTime();
+
+    const newStartDate = parsed.data.newStartDate || nextYearStart;
+    const newEndDate = new Date(newStartDate.getTime() + duration);
+
+    // Clone session and forms in transaction
+    const clonedSession = await db.transaction(async (tx) => {
+      // Create cloned session
+      const [cloned] = await tx
+        .insert(sessions)
+        .values({
+          name: parsed.data.newName || `${original.name} ${newStartDate.getFullYear()}`,
+          description: original.description,
+          startDate: newStartDate,
+          endDate: newEndDate,
+          price: original.price,
+          capacity: original.capacity,
+          status: "draft",
+          minAge: original.minAge,
+          maxAge: original.maxAge,
+          minGrade: original.minGrade,
+          maxGrade: original.maxGrade,
+          registrationOpenDate: original.registrationOpenDate,
+          registrationCloseDate: original.registrationCloseDate,
+          specialInstructions: original.specialInstructions,
+          whatToBring: original.whatToBring,
+        })
+        .returning();
+
+      // Clone associated forms
+      if (original.sessionForms && original.sessionForms.length > 0) {
+        await tx.insert(sessionForms).values(
+          original.sessionForms.map((sf) => ({
+            sessionId: cloned.id,
+            formId: sf.formId,
+            required: sf.required,
+            displayOrder: sf.displayOrder,
+          }))
+        );
+      }
+
+      return cloned;
+    });
+
+    revalidatePath("/dashboard/admin");
+    revalidatePath("/dashboard/admin/programs");
+
+    return { success: true, session: clonedSession };
+  } catch (error) {
+    console.error("Failed to clone session:", error);
+    return { success: false, error: "Failed to clone session" };
+  }
+}

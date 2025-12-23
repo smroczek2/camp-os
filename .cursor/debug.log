@@ -59,3 +59,20 @@
 {"location":"auth-helper.ts:9","message":"getSession called","data":{},"timestamp":1766064516544,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
 {"location":"auth-helper.ts:13","message":"Headers retrieved, calling getSession","data":{"hasHeaders":true},"timestamp":1766064516550,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
 {"location":"auth-helper.ts:18","message":"getSession result","data":{"hasSession":false,"hasUser":false},"timestamp":1766064516552,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"dashboard/page.tsx:11","message":"DashboardPage entry","data":{},"timestamp":1766416198722,"sessionId":"debug-session","runId":"run3","hypothesisId":"A,B,C,D,E"}
+{"location":"dashboard/page.tsx:32","message":"Session retrieved","data":{"hasSession":true,"hasUser":true,"userId":"spencer-admin","userRole":"admin"},"timestamp":1766416199061,"sessionId":"debug-session","runId":"run3","hypothesisId":"C,D"}
+{"location":"dashboard/page.tsx:50","message":"Before DB query","data":{"sessionRole":"admin","userId":"spencer-admin","needsDbQuery":false},"timestamp":1766416199062,"sessionId":"debug-session","runId":"run2","hypothesisId":"A,C"}
+{"location":"dashboard/page.tsx:62","message":"DB query completed","data":{"userRecordFound":false},"timestamp":1766416199062,"sessionId":"debug-session","runId":"run2","hypothesisId":"A"}
+{"location":"dashboard/page.tsx:75","message":"Role determined","data":{"role":"admin","hasRole":true},"timestamp":1766416199062,"sessionId":"debug-session","runId":"run2","hypothesisId":"C"}
+{"location":"dashboard/page.tsx:123","message":"Before redirect","data":{"role":"admin","redirectPath":"/dashboard/admin"},"timestamp":1766416199062,"sessionId":"debug-session","runId":"run3","hypothesisId":"B,E"}
+{"location":"dashboard/page.tsx:11","message":"DashboardPage entry","data":{},"timestamp":1766416276845,"sessionId":"debug-session","runId":"run3","hypothesisId":"A,B,C,D,E"}
+{"location":"dashboard/page.tsx:11","message":"DashboardPage entry","data":{},"timestamp":1766416639916,"sessionId":"debug-session","runId":"run3","hypothesisId":"A,B,C,D,E"}
+{"location":"dashboard/page.tsx:32","message":"Session retrieved","data":{"hasSession":true,"hasUser":true,"userId":"spencer-admin","userRole":"admin"},"timestamp":1766416640167,"sessionId":"debug-session","runId":"run3","hypothesisId":"C,D"}
+{"location":"dashboard/page.tsx:50","message":"Before DB query","data":{"sessionRole":"admin","userId":"spencer-admin","needsDbQuery":false},"timestamp":1766416640167,"sessionId":"debug-session","runId":"run2","hypothesisId":"A,C"}
+{"location":"dashboard/page.tsx:62","message":"DB query completed","data":{"userRecordFound":false},"timestamp":1766416640167,"sessionId":"debug-session","runId":"run2","hypothesisId":"A"}
+{"location":"dashboard/page.tsx:75","message":"Role determined","data":{"role":"admin","hasRole":true},"timestamp":1766416640167,"sessionId":"debug-session","runId":"run2","hypothesisId":"C"}
+{"location":"dashboard/page.tsx:123","message":"Before redirect","data":{"role":"admin","redirectPath":"/dashboard/admin"},"timestamp":1766416640167,"sessionId":"debug-session","runId":"run3","hypothesisId":"B,E"}
+{"location":"dashboard/page.tsx:11","message":"DashboardPage entry","data":{},"timestamp":1766416661268,"sessionId":"debug-session","runId":"run3","hypothesisId":"A,B,C,D,E"}
+{"location":"dashboard/page.tsx:32","message":"Session retrieved","data":{"hasSession":false,"hasUser":false},"timestamp":1766416661286,"sessionId":"debug-session","runId":"run3","hypothesisId":"C,D"}
+{"location":"dashboard/page.tsx:40","message":"No session/user, redirecting to login","data":{},"timestamp":1766416661287,"sessionId":"debug-session","runId":"run3","hypothesisId":"D"}
+{"location":"dashboard/admin/page.tsx:20","message":"AdminDashboard session check","data":{"hasSession":true,"hasUser":true,"userId":"spencer-admin"},"timestamp":1766416682630,"sessionId":"debug-session","runId":"run4","hypothesisId":"B"}

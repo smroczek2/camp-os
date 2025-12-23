@@ -4,13 +4,16 @@ import { db } from "@/lib/db";
 import { registrations } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
+import { Suspense } from "react";
 
 interface CheckoutPageProps {
   params: Promise<{ registrationId: string }>;
+  searchParams: Promise<{ from?: string }>;
 }
 
-export default async function CheckoutPage({ params }: CheckoutPageProps) {
+export default async function CheckoutPage({ params, searchParams }: CheckoutPageProps) {
   const { registrationId } = await params;
+  const { from } = await searchParams;
   const session = await getSession();
 
   if (!session?.user) {
@@ -40,6 +43,8 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
     redirect(`/checkout/${registrationId}/confirmation`);
   }
 
+  const isFromRegistration = from === "registration";
+
   return (
     <div className="container mx-auto px-4 py-12 max-w-2xl">
       <h1 className="text-3xl font-bold mb-2">Checkout</h1>
@@ -47,7 +52,12 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         Complete your registration payment
       </p>
 
-      <CheckoutForm registration={registration} />
+      <Suspense fallback={null}>
+        <CheckoutForm
+          registration={registration}
+          showCountdown={isFromRegistration}
+        />
+      </Suspense>
     </div>
   );
 }

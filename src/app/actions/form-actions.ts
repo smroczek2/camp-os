@@ -12,9 +12,10 @@ import {
 import { sanitizeGeneratedForm } from "@/lib/ai-tools/form-builder-tool";
 import { ForbiddenError } from "@/lib/rbac";
 import { db } from "@/lib/db";
-import { aiActions, events, children, registrations } from "@/lib/schema";
+import { aiActions, events, children, registrations, formSubmissions } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { revalidatePath } from "next/cache";
 import type {
   GeneratedFormResult,
   AIFormGeneration,
@@ -316,6 +317,21 @@ export async function publishFormAction(formId: string) {
 }
 
 /**
+ * Unpublish a form (make it unavailable to users)
+ */
+export async function unpublishFormAction(formId: string) {
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check permission
+  await enforcePermission(session.user.id, "form", "update");
+
+  return formService.unpublishForm(formId, session.user.id);
+}
+
+/**
  * Archive a form
  */
 export async function archiveFormAction(formId: string) {
@@ -403,4 +419,147 @@ export async function updateFormAction(data: {
     formType: parsed.formType,
     fields: parsed.fields,
   });
+}
+
+/**
+ * Bulk publish forms (admin only)
+ */
+export async function bulkPublishFormsAction(formIds: string[]) {
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check permission
+  await enforcePermission(session.user.id, "form", "update");
+
+  const parsed = z
+    .array(z.string().uuid())
+    .min(1)
+    .parse(formIds);
+
+  // Publish all forms in parallel
+  const results = await Promise.allSettled(
+    parsed.map((formId) => formService.publishForm(formId, session.user.id))
+  );
+
+  const successCount = results.filter((r) => r.status === "fulfilled").length;
+  const failCount = results.filter((r) => r.status === "rejected").length;
+
+  return {
+    success: true,
+    successCount,
+    failCount,
+    total: formIds.length,
+  };
+}
+
+/**
+ * Bulk unpublish forms (admin only)
+ */
+export async function bulkUnpublishFormsAction(formIds: string[]) {
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check permission
+  await enforcePermission(session.user.id, "form", "update");
+
+  const parsed = z
+    .array(z.string().uuid())
+    .min(1)
+    .parse(formIds);
+
+  // Unpublish all forms using the formService
+  const results = await Promise.allSettled(
+    parsed.map((formId) => formService.unpublishForm(formId, session.user.id))
+  );
+
+  const successCount = results.filter((r) => r.status === "fulfilled").length;
+  const failCount = results.filter((r) => r.status === "rejected").length;
+
+  return {
+    success: true,
+    successCount,
+    failCount,
+    total: formIds.length,
+  };
+}
+
+/**
+ * Bulk delete forms (admin only)
+ */
+export async function bulkDeleteFormsAction(formIds: string[]) {
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check permission
+  await enforcePermission(session.user.id, "form", "delete");
+
+  const parsed = z
+    .array(z.string().uuid())
+    .min(1)
+    .parse(formIds);
+
+  // Delete all forms in parallel (or archive them)
+  const results = await Promise.allSettled(
+    parsed.map((formId) => formService.archiveForm(formId, session.user.id))
+  );
+
+  const successCount = results.filter((r) => r.status === "fulfilled").length;
+  const failCount = results.filter((r) => r.status === "rejected").length;
+
+  return {
+    success: true,
+    successCount,
+    failCount,
+    total: formIds.length,
+  };
+}
+
+
+/**
+ * Bulk update form submissions status (admin only)
+ */
+export async function bulkUpdateSubmissionsAction(data: {
+  submissionIds: string[];
+  status: "reviewed" | "approved" | "needs_revision";
+}) {
+  const session = await getSession();
+  if (!session?.user || session.user.role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  // Validate input
+  const parsed = z.object({
+    submissionIds: z.array(z.string().uuid()).min(1),
+    status: z.enum(["reviewed", "approved", "needs_revision"]),
+  }).parse(data);
+
+  // Update all submissions
+  const results = await Promise.allSettled(
+    parsed.submissionIds.map(async (submissionId) => {
+      await db
+        .update(formSubmissions)
+        .set({
+          status: parsed.status,
+        })
+        .where(eq(formSubmissions.id, submissionId));
+    })
+  );
+
+  const successCount = results.filter((r) => r.status === "fulfilled").length;
+  const failCount = results.filter((r) => r.status === "rejected").length;
+
+  revalidatePath("/dashboard/admin/forms");
+
+  return {
+    success: true,
+    successCount,
+    failCount,
+    total: parsed.submissionIds.length,
+  };
 }

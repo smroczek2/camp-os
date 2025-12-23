@@ -5,7 +5,6 @@ import { incidents } from "@/lib/schema";
 import { desc } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import {
-  ChevronLeft,
   AlertTriangle,
   AlertCircle,
   Info,
@@ -13,6 +12,7 @@ import {
   Clock,
 } from "lucide-react";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -75,16 +75,16 @@ export default async function IncidentsFeedPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Incident Reports" },
+        ]}
+      />
+
       {/* Header */}
       <div className="mb-8">
-        <Link
-          href="/dashboard/admin"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Link>
-
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">Incident Reports</h1>

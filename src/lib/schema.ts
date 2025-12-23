@@ -616,6 +616,9 @@ export const formSubmissions = pgTable(
       .notNull()
       .$type<Record<string, unknown>>(),
     submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+    reviewedBy: text("reviewed_by").references(() => user.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at"),
+    reviewNotes: text("review_notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

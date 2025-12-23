@@ -1,8 +1,8 @@
 # Camp OS - Project Status
 
-**Last Updated:** 2025-12-15
-**Current Phase:** Phase 1 Complete (Foundation)
-**Next Phase:** Phase 2 (Registration Forms)
+**Last Updated:** 2025-12-22
+**Current Phase:** Post-MVP (Core Features Complete)
+**Next Focus:** Parent Dashboard UX Improvements
 
 ---
 
@@ -17,7 +17,26 @@ See `plans/camp-os-three-surface-platform.md` for complete vision.
 
 ---
 
-## ✅ Phase 1: Foundation (COMPLETE - 2025-12-15)
+## ✅ Completed Features
+
+### Phase 1: Foundation (COMPLETE - Dec 2025)
+
+#### Core Platform Features ✅
+- Multi-role authentication (Parent, Admin, Super Admin)
+- Organization management with RBAC
+- User invitation system
+- Child profile management
+- Session creation and management
+- Registration system with payment integration (Stripe demo mode)
+- Waitlist management with auto-promotion
+- Dynamic form builder with AI generation
+- Form submission and review workflows
+- Medication tracking (CRUD complete)
+- Email notifications (via Resend)
+- Attendance check-in system
+- All security fixes (RBAC hardening, auth validation)
+
+### Phase 2-2.5: Registration & Forms (COMPLETE - Dec 2025)
 
 ### Database Schema - DONE ✅
 
@@ -184,56 +203,61 @@ Parents: jennifer.smith@example.com (Emma & Liam)
 
 ---
 
-## 🚧 Phase 2: Registration Flow (TODO)
+## 📋 Active Plans & Next Steps
 
-**Goal:** Parents can register children for camp sessions
+### Primary Focus: Parent Dashboard UX Improvements
+**Plan:** `plans/parent-dashboard-ux-improvement-plan.md`
+**Status:** Ready for Implementation
+**Timeline:** 5 phases over ~10 weeks
 
-**Tasks:**
-- [ ] Multi-step registration form (4 steps)
-- [ ] Form validation with Zod
-- [ ] Child information step
-- [ ] Medical information step
-- [ ] Payment integration (mock Stripe)
-- [ ] Confirmation page
+**Phase 1 (Critical - Week 1-2):**
+- Add mobile navigation (bottom tab bar or hamburger)
+- Fix registration → payment flow (immediate redirect to checkout)
+- Add edit functionality for child profiles
+- Show waitlist position with context (e.g., "#3 of 12")
 
-**Dependencies Needed:**
-- React Hook Form
-- Zustand (form state)
-- Stripe SDK (for mock payments)
+**Phase 2 (IA - Week 3-4):**
+- Add session filters and sorting
+- Create dedicated medication management page
+- Implement consistent component library
+- Reorganize dashboard information architecture
 
-**⚠️ START HERE for next feature work**
+**Phase 3-5:** Enhanced interactions, visual polish, advanced features
 
----
+See full plan in `plans/parent-dashboard-ux-improvement-plan.md`
 
-## 🚧 Phase 3: Check-In/Check-Out (TODO)
+### Strategic Plans (Reference)
+- Multi-tenant infrastructure foundation
+- Single-tenant architecture migration (alternative)
+- Camp OS three-surface platform vision
+- Technical architecture addendum
 
-**Goal:** Staff can check in/out children
+## 📊 Project Organization
 
-**Tasks:**
-- [ ] Check-in interface for staff
-- [ ] QR code scanning (optional)
-- [ ] Check-out with parent verification
-- [ ] Attendance recording
-- [ ] Server Actions for attendance mutations
+### Documentation Structure
+- `AGENTS.md` - Universal guidelines and patterns (READ FIRST)
+- `CLAUDE.md` - Claude Code specific instructions
+- `README.md` - Setup and getting started
+- `PROJECT-STATUS.md` - This file (current status)
+- `docs/` - Additional documentation
 
-**Tables Available:**
-- `attendance` table exists in schema (ready to use)
+### Plans & Todos
+- **`plans/`** - Implementation plans for major features
+  - **Active:** 5 plans (1 active implementation, 4 reference)
+  - **Archive:** 5 completed plans
+  - **README:** See `plans/README.md`
 
----
+- **`todos/`** - Individual todo items (file-based system)
+  - **Active:** 0 (all completed! 🎉)
+  - **Archive:** 25 completed todos
+  - **README:** See `todos/README.md`
 
-## 🚧 Phase 4: Incident Reporting (TODO)
-
-**Goal:** Staff can report incidents
-
-**Tasks:**
-- [ ] Incident report form
-- [ ] Photo upload support
-- [ ] Severity selection
-- [ ] Parent notifications
-- [ ] Server Actions for incident creation
-
-**Tables Available:**
-- `incidents` table exists in schema (ready to use)
+### Recent Cleanup (Dec 22, 2025)
+- ✅ Moved UX plan from docs to plans
+- ✅ Archived 5 completed plans
+- ✅ Archived 25 completed todos
+- ✅ Created README files for organization
+- ✅ Updated PROJECT-STATUS.md
 
 ---
 
@@ -345,4 +369,50 @@ Parents: jennifer.smith@example.com (Emma & Liam)
 
 ---
 
-**Summary:** Phase 1 (Foundation) is complete. Database seeded, dashboards working, RBAC enforced. Ready for Phase 2 (Registration Forms).
+## 📈 Key Metrics & Success Indicators
+
+**Current Status (Dec 22, 2025):**
+- ✅ All core features implemented and functional
+- ✅ All 25 identified todos completed and archived
+- ✅ All security vulnerabilities addressed
+- ✅ Database optimizations complete
+- ✅ Email notification system working
+- ✅ Waitlist with auto-promotion functional
+- ✅ 0 active blockers
+
+**Next Milestone:**
+- Parent Dashboard UX Phase 1 implementation
+- Target: 40% reduction in registration abandonment
+- Target: 60% faster time-to-first-registration
+- Target: 80% reduction in support tickets
+
+## 🎯 Getting Started
+
+**For Development:**
+```bash
+npm install
+npm run dev         # Start dev server
+```
+
+**For Database:**
+```bash
+npm run db:push     # Push schema changes
+npm run db:studio   # Open Drizzle Studio GUI
+npm run db:seed     # Populate test data (⚠️ deletes existing data)
+```
+
+**For Quality Checks:**
+```bash
+npm run lint        # Run ESLint
+npm run typecheck   # Run TypeScript checks
+npm run build       # Test production build
+```
+
+**For Testing:**
+1. Navigate to http://localhost:3000/dev-login
+2. Click any user card to log in
+3. Use "Switch Role" dropdown to test different views
+
+---
+
+**Summary:** Core platform complete and production-ready. Focus shifting to UX improvements for parent-facing surfaces. All major features functional, 25 todos completed, ready for Phase 1 UX enhancements.

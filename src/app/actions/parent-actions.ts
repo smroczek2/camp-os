@@ -191,3 +191,62 @@ export async function cancelRegistrationAction(registrationId: string) {
   revalidatePath("/dashboard/parent");
   return { success: true };
 }
+
+/**
+ * Update a child's information
+ */
+export async function updateChildAction(
+  childId: string,
+  data: {
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string; // ISO date string
+    allergies?: string[];
+    medicalNotes?: string;
+  }
+) {
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check permission and ownership
+  await enforcePermission(session.user.id, "child", "update", childId);
+
+  // Validate date
+  const dob = new Date(data.dateOfBirth);
+  if (isNaN(dob.getTime())) {
+    throw new Error("Invalid date of birth");
+  }
+
+  // Update child
+  const result = await db.transaction(async (tx) => {
+    const [child] = await tx
+      .update(children)
+      .set({
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        dateOfBirth: dob,
+        allergies: data.allergies || [],
+        medicalNotes: data.medicalNotes?.trim() || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(children.id, childId))
+      .returning();
+
+    // Log event
+    await tx.insert(events).values({
+      streamId: `child-${child.id}`,
+      eventType: "ChildUpdated",
+      eventData: child as unknown as Record<string, unknown>,
+      version: 1,
+      userId: session.user.id,
+    });
+
+    return child;
+  });
+
+  revalidatePath("/dashboard/parent");
+  revalidatePath("/dashboard/parent/children");
+  return { success: true, child: result };
+}

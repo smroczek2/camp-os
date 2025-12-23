@@ -5,10 +5,8 @@ import { sessions } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import {
-  Calendar,
   Users,
   DollarSign,
-  ChevronLeft,
   GraduationCap,
   Clock,
   ExternalLink,
@@ -20,6 +18,10 @@ import { CopyLinkButton } from "@/components/admin/copy-link-button";
 import { EditSessionDialog } from "@/components/admin/edit-session-dialog";
 import { RegistrationList } from "@/components/admin/registration-list";
 import { SessionActionsDropdown } from "@/components/admin/session-actions-dropdown";
+import { WaitlistTable } from "@/components/admin/waitlist-table";
+import { SessionFormsTable } from "@/components/admin/session-forms-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +56,13 @@ export default async function SessionDetailPage({ params }: Props) {
           user: true,
         },
       },
+      waitlist: {
+        with: {
+          child: true,
+          user: true,
+        },
+      },
+      formDefinitions: true,
     },
   });
 
@@ -67,7 +76,7 @@ export default async function SessionDetailPage({ params }: Props) {
   const pendingCount = campSession.registrations.filter(
     (r) => r.status === "pending"
   ).length;
-  const fillRate = (confirmedCount / campSession.capacity) * 100;
+  const waitlistCount = campSession.waitlist?.length || 0;
   const revenue = campSession.registrations
     .filter((r) => r.status === "confirmed")
     .reduce((sum, r) => sum + (parseFloat(r.amountPaid || "0") || parseFloat(campSession.price)), 0);
@@ -98,13 +107,13 @@ export default async function SessionDetailPage({ params }: Props) {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Breadcrumb */}
-      <Link
-        href="/dashboard/admin/programs"
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ChevronLeft className="h-4 w-4 mr-1" />
-        Back to Sessions
-      </Link>
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Sessions", href: "/dashboard/admin/programs" },
+          { label: campSession.name },
+        ]}
+      />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
@@ -160,11 +169,11 @@ export default async function SessionDetailPage({ params }: Props) {
         <div className="p-4 border rounded-xl bg-card shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/10">
-              <Users className="h-5 w-5 text-orange-600" />
+              <Clock className="h-5 w-5 text-orange-600" />
             </div>
             <div>
               <p className="text-2xl font-bold">{pendingCount}</p>
-              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="text-xs text-muted-foreground">Pending Payment</p>
             </div>
           </div>
         </div>
@@ -172,15 +181,11 @@ export default async function SessionDetailPage({ params }: Props) {
         <div className="p-4 border rounded-xl bg-card shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-purple-500/10">
-              <Calendar className="h-5 w-5 text-purple-600" />
+              <Users className="h-5 w-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">
-                {fillRate.toFixed(0)}%
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {confirmedCount} / {campSession.capacity} spots
-              </p>
+              <p className="text-2xl font-bold">{waitlistCount}</p>
+              <p className="text-xs text-muted-foreground">Waitlist</p>
             </div>
           </div>
         </div>
@@ -198,94 +203,122 @@ export default async function SessionDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Details Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Session Info */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* Pricing */}
-          <div className="p-4 border rounded-xl bg-card shadow-sm">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Pricing
-            </h3>
-            <p className="text-2xl font-bold">${campSession.price}</p>
-            <p className="text-sm text-muted-foreground">per registration</p>
-          </div>
+      {/* Tabs Section */}
+      <Tabs defaultValue="registrations" className="mb-8">
+        <TabsList className="mb-6">
+          <TabsTrigger value="registrations">
+            Registrations ({campSession.registrations.length})
+          </TabsTrigger>
+          <TabsTrigger value="waitlist">
+            Waitlist ({waitlistCount})
+          </TabsTrigger>
+          <TabsTrigger value="forms">
+            Forms ({campSession.formDefinitions?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="details">
+            Details
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Eligibility */}
-          {eligibilityParts.length > 0 && (
-            <div className="p-4 border rounded-xl bg-card shadow-sm">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                Eligibility
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {eligibilityParts.map((part, idx) => (
-                  <Badge key={idx} variant="outline">
-                    {part}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Registration Window */}
-          {(campSession.registrationOpenDate || campSession.registrationCloseDate) && (
-            <div className="p-4 border rounded-xl bg-card shadow-sm">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Registration Window
-              </h3>
-              <div className="space-y-2 text-sm">
-                {campSession.registrationOpenDate && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Opens</span>
-                    <span>{formatDate(campSession.registrationOpenDate)}</span>
-                  </div>
-                )}
-                {campSession.registrationCloseDate && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Closes</span>
-                    <span>{formatDate(campSession.registrationCloseDate)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Additional Details */}
-          {(campSession.specialInstructions || campSession.whatToBring) && (
-            <div className="p-4 border rounded-xl bg-card shadow-sm">
-              <h3 className="font-semibold mb-3">Additional Details</h3>
-              {campSession.specialInstructions && (
-                <div className="mb-3">
-                  <p className="text-sm font-medium mb-1">Special Instructions</p>
-                  <p className="text-sm text-muted-foreground">
-                    {campSession.specialInstructions}
-                  </p>
-                </div>
-              )}
-              {campSession.whatToBring && (
-                <div>
-                  <p className="text-sm font-medium mb-1">What to Bring</p>
-                  <p className="text-sm text-muted-foreground">
-                    {campSession.whatToBring}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Registrations */}
-        <div className="lg:col-span-2">
+        <TabsContent value="registrations">
           <RegistrationList
             registrations={campSession.registrations}
             sessionId={campSession.id}
             sessionPrice={campSession.price}
           />
-        </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="waitlist">
+          <WaitlistTable waitlist={campSession.waitlist || []} />
+        </TabsContent>
+
+        <TabsContent value="forms">
+          <SessionFormsTable
+            forms={campSession.formDefinitions || []}
+            sessionId={campSession.id}
+          />
+        </TabsContent>
+
+        <TabsContent value="details">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Pricing */}
+            <div className="p-4 border rounded-xl bg-card shadow-sm">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Pricing
+              </h3>
+              <p className="text-2xl font-bold">${campSession.price}</p>
+              <p className="text-sm text-muted-foreground">per registration</p>
+            </div>
+
+            {/* Eligibility */}
+            {eligibilityParts.length > 0 && (
+              <div className="p-4 border rounded-xl bg-card shadow-sm">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Eligibility
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {eligibilityParts.map((part, idx) => (
+                    <Badge key={idx} variant="outline">
+                      {part}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Registration Window */}
+            {(campSession.registrationOpenDate || campSession.registrationCloseDate) && (
+              <div className="p-4 border rounded-xl bg-card shadow-sm">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Registration Window
+                </h3>
+                <div className="space-y-2 text-sm">
+                  {campSession.registrationOpenDate && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Opens</span>
+                      <span>{formatDate(campSession.registrationOpenDate)}</span>
+                    </div>
+                  )}
+                  {campSession.registrationCloseDate && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Closes</span>
+                      <span>{formatDate(campSession.registrationCloseDate)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Additional Details */}
+            {(campSession.specialInstructions || campSession.whatToBring) && (
+              <div className="p-4 border rounded-xl bg-card shadow-sm md:col-span-2 lg:col-span-3">
+                <h3 className="font-semibold mb-3">Additional Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {campSession.specialInstructions && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">Special Instructions</p>
+                      <p className="text-sm text-muted-foreground">
+                        {campSession.specialInstructions}
+                      </p>
+                    </div>
+                  )}
+                  {campSession.whatToBring && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">What to Bring</p>
+                      <p className="text-sm text-muted-foreground">
+                        {campSession.whatToBring}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

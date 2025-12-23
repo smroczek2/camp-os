@@ -70,6 +70,8 @@ export function DynamicForm({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [previewNotice, setPreviewNotice] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveInterval, setSaveInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Build Zod schema dynamically from form definition
   const visibleFields = formConfig.fields.filter(
@@ -91,16 +93,32 @@ export function DynamicForm({
   // Watch all fields for conditional logic
   const formValues = useWatch({ control: form.control });
 
-  // Save draft to localStorage (submit mode only)
+  // Save draft to localStorage every 30 seconds (submit mode only)
   useEffect(() => {
     if (mode !== "submit") return;
-    const subscription = form.watch((value) => {
-      localStorage.setItem(
-        `form-draft-${formConfig.id}`,
-        JSON.stringify(value)
-      );
-    });
-    return () => subscription.unsubscribe();
+
+    const saveDraft = () => {
+      const currentValues = form.getValues();
+      // Only save if there's any data
+      if (Object.keys(currentValues).length > 0) {
+        localStorage.setItem(
+          `form-draft-${formConfig.id}`,
+          JSON.stringify({
+            data: currentValues,
+            savedAt: new Date().toISOString(),
+          })
+        );
+        setLastSaved(new Date());
+      }
+    };
+
+    // Save every 30 seconds
+    const interval = setInterval(saveDraft, 30000);
+    setSaveInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [form, formConfig.id, mode]);
 
   // Restore draft on mount
@@ -109,7 +127,15 @@ export function DynamicForm({
     const draft = localStorage.getItem(`form-draft-${formConfig.id}`);
     if (draft) {
       try {
-        form.reset(JSON.parse(draft));
+        const parsed = JSON.parse(draft);
+        // Handle both old format (direct data) and new format (with metadata)
+        const draftData = parsed.data || parsed;
+        const savedAt = parsed.savedAt ? new Date(parsed.savedAt) : null;
+
+        form.reset(draftData);
+        if (savedAt) {
+          setLastSaved(savedAt);
+        }
       } catch (e) {
         console.error("Failed to restore draft:", e);
       }
@@ -189,6 +215,10 @@ export function DynamicForm({
 
       // Clear draft after successful submission
       localStorage.removeItem(`form-draft-${formConfig.id}`);
+      setLastSaved(null);
+      if (saveInterval) {
+        clearInterval(saveInterval);
+      }
 
       router.push(`/dashboard/parent/forms/success?formId=${formConfig.id}`);
     } catch (error) {
@@ -205,11 +235,33 @@ export function DynamicForm({
     (a, b) => a.displayOrder - b.displayOrder
   );
 
+  // Format last saved time
+  const formatLastSaved = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins === 1) return "1 minute ago";
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours === 1) return "1 hour ago";
+    if (diffHours < 24) return `${diffHours} hours ago`;
+
+    return date.toLocaleDateString();
+  };
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       {mode === "preview" && previewNotice && (
         <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
           {previewNotice}
+        </div>
+      )}
+      {mode === "submit" && lastSaved && (
+        <div className="flex items-center justify-end text-xs text-muted-foreground">
+          <span>Draft saved {formatLastSaved(lastSaved)}</span>
         </div>
       )}
       {sortedFields.map((field) => {

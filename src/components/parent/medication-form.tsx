@@ -16,11 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   addMedicationAction,
   updateMedicationAction,
   deleteMedicationAction,
 } from "@/app/actions/medication-actions";
-import { Pill, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import { Pill, Loader2, AlertCircle, Trash2, Sparkles } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MEDICATION_TEMPLATES, getTemplateById } from "@/lib/medication-templates";
 
 interface MedicationFormProps {
   childId: string;
@@ -58,9 +66,40 @@ export function MedicationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [formData, setFormData] = useState({
+    name: medication?.name || "",
+    dosage: medication?.dosage || "",
+    frequency: medication?.frequency || "",
+    instructions: medication?.instructions || "",
+  });
   const router = useRouter();
 
   const isEditing = !!medication;
+
+  // Handle template selection
+  function handleTemplateSelect(templateId: string) {
+    setSelectedTemplate(templateId);
+    if (templateId === "none") {
+      setFormData({
+        name: "",
+        dosage: "",
+        frequency: "",
+        instructions: "",
+      });
+      return;
+    }
+
+    const template = getTemplateById(templateId);
+    if (template) {
+      setFormData({
+        name: template.name,
+        dosage: template.dosage,
+        frequency: template.frequency,
+        instructions: template.instructions,
+      });
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -145,38 +184,134 @@ export function MedicationForm({
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {!isEditing && (
+                <div className="grid gap-2">
+                  <Label htmlFor="template">Quick Fill Template</Label>
+                  <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                    <SelectTrigger id="template">
+                      <SelectValue placeholder="Choose a medication template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="flex items-center gap-2">
+                          None - Enter manually
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="divider" disabled className="border-t pt-2">
+                        <span className="text-xs font-semibold">Pain Relief</span>
+                      </SelectItem>
+                      {MEDICATION_TEMPLATES.filter((t) => t.category === "pain-relief").map(
+                        (template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3" />
+                              {template.name}
+                            </span>
+                          </SelectItem>
+                        )
+                      )}
+                      <SelectItem value="divider2" disabled className="border-t pt-2">
+                        <span className="text-xs font-semibold">Allergy</span>
+                      </SelectItem>
+                      {MEDICATION_TEMPLATES.filter((t) => t.category === "allergy").map(
+                        (template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3" />
+                              {template.name}
+                            </span>
+                          </SelectItem>
+                        )
+                      )}
+                      <SelectItem value="divider3" disabled className="border-t pt-2">
+                        <span className="text-xs font-semibold">Asthma</span>
+                      </SelectItem>
+                      {MEDICATION_TEMPLATES.filter((t) => t.category === "asthma").map(
+                        (template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3" />
+                              {template.name}
+                            </span>
+                          </SelectItem>
+                        )
+                      )}
+                      <SelectItem value="divider4" disabled className="border-t pt-2">
+                        <span className="text-xs font-semibold">Emergency</span>
+                      </SelectItem>
+                      {MEDICATION_TEMPLATES.filter((t) => t.category === "emergency").map(
+                        (template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3" />
+                              {template.name}
+                            </span>
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Select a common medication to auto-fill the form
+                  </p>
+                </div>
+              )}
+
               <div className="grid gap-2">
                 <Label htmlFor="name">Medication Name *</Label>
                 <Input
                   id="name"
                   name="name"
                   placeholder="e.g., Ibuprofen, Albuterol"
-                  defaultValue={medication?.name}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="dosage">Dosage *</Label>
+              <div className="grid gap-2">
+                <Label htmlFor="dosage">Dosage *</Label>
+                <div className="grid grid-cols-2 gap-2">
                   <Input
                     id="dosage"
                     name="dosage"
                     placeholder="e.g., 200mg, 2 puffs"
-                    defaultValue={medication?.dosage}
+                    value={formData.dosage}
+                    onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
                     required
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="frequency">Frequency *</Label>
-                  <Input
-                    id="frequency"
-                    name="frequency"
-                    placeholder="e.g., Twice daily, As needed"
-                    defaultValue={medication?.frequency}
-                    required
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter full dosage (e.g., &quot;200mg&quot;, &quot;2 puffs&quot;, &quot;1 tablet&quot;)
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="frequency">Frequency *</Label>
+                <Select
+                  value={formData.frequency}
+                  onValueChange={(value) => setFormData({ ...formData, frequency: value })}
+                >
+                  <SelectTrigger id="frequency">
+                    <SelectValue placeholder="Select frequency..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Once daily">Once daily</SelectItem>
+                    <SelectItem value="Twice daily">Twice daily</SelectItem>
+                    <SelectItem value="Three times daily">Three times daily</SelectItem>
+                    <SelectItem value="Four times daily">Four times daily</SelectItem>
+                    <SelectItem value="Every 4 hours">Every 4 hours</SelectItem>
+                    <SelectItem value="Every 6 hours">Every 6 hours</SelectItem>
+                    <SelectItem value="Every 8 hours">Every 8 hours</SelectItem>
+                    <SelectItem value="Every 12 hours">Every 12 hours</SelectItem>
+                    <SelectItem value="As needed">As needed</SelectItem>
+                    <SelectItem value="Before meals">Before meals</SelectItem>
+                    <SelectItem value="With meals">With meals</SelectItem>
+                    <SelectItem value="At bedtime">At bedtime</SelectItem>
+                    <SelectItem value="Weekly">Weekly</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input type="hidden" name="frequency" value={formData.frequency} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -223,7 +358,8 @@ export function MedicationForm({
                   name="instructions"
                   placeholder="Any special instructions for administering this medication..."
                   rows={3}
-                  defaultValue={medication?.instructions || ""}
+                  value={formData.instructions}
+                  onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
                 />
               </div>
 

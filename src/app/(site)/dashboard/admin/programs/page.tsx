@@ -6,7 +6,6 @@ import { desc } from "drizzle-orm";
 import {
   Calendar,
   Users,
-  ChevronLeft,
   ChevronRight,
   DollarSign,
   Sparkles,
@@ -15,6 +14,8 @@ import Link from "next/link";
 import { CreateSessionDialog } from "@/components/admin/create-session-dialog";
 import { SessionStatusBadge } from "@/components/admin/session-status-badge";
 import { Button } from "@/components/ui/button";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
+import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
@@ -45,16 +46,16 @@ export default async function SessionsManagementPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Sessions" },
+        ]}
+      />
+
       {/* Header */}
       <div className="mb-8">
-        <Link
-          href="/dashboard/admin"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Link>
-
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">Sessions</h1>
@@ -142,12 +143,15 @@ export default async function SessionsManagementPage() {
                 (r) => r.status === "confirmed"
               ).length;
               const fillRate = (confirmedCount / campSession.capacity) * 100;
+              const isNearlyFull = fillRate >= 90;
 
               return (
                 <Link
                   key={campSession.id}
                   href={`/dashboard/admin/programs/${campSession.id}`}
-                  className="block p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                  className={`block p-4 hover:bg-muted/30 transition-colors cursor-pointer ${
+                    isNearlyFull ? "bg-orange-50 dark:bg-orange-950/20" : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -159,6 +163,11 @@ export default async function SessionsManagementPage() {
                           sessionId={campSession.id}
                           status={campSession.status}
                         />
+                        {isNearlyFull && (
+                          <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">
+                            90% Full
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -181,7 +190,7 @@ export default async function SessionsManagementPage() {
                           <Users className="h-3 w-3" />
                           {confirmedCount} / {campSession.capacity}
                         </span>
-                        <span>{fillRate.toFixed(0)}% full</span>
+                        <span className={isNearlyFull ? "font-medium text-orange-600 dark:text-orange-400" : ""}>{fillRate.toFixed(0)}% full</span>
                       </div>
                       {campSession.description && (
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-1">
@@ -197,7 +206,7 @@ export default async function SessionsManagementPage() {
                           <div
                             className={`h-full transition-all ${
                               fillRate >= 90
-                                ? "bg-red-500"
+                                ? "bg-orange-500"
                                 : fillRate >= 70
                                   ? "bg-yellow-500"
                                   : "bg-green-500"
@@ -205,6 +214,9 @@ export default async function SessionsManagementPage() {
                             style={{ width: `${Math.min(fillRate, 100)}%` }}
                           />
                         </div>
+                        <p className="text-xs text-center mt-1 text-muted-foreground">
+                          {fillRate.toFixed(0)}%
+                        </p>
                       </div>
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>

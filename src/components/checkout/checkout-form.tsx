@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   DollarSign,
   Shield,
   AlertCircle,
+  Clock,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -38,12 +39,37 @@ type Registration = {
 
 interface CheckoutFormProps {
   registration: Registration;
+  showCountdown?: boolean;
 }
 
-export function CheckoutForm({ registration }: CheckoutFormProps) {
+export function CheckoutForm({ registration, showCountdown = false }: CheckoutFormProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes in seconds
   const router = useRouter();
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!showCountdown) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showCountdown]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,8 +99,37 @@ export function CheckoutForm({ registration }: CheckoutFormProps) {
     }
   }
 
+  const handlePayLater = () => {
+    router.push("/dashboard/parent/registrations");
+  };
+
   return (
     <div className="space-y-6">
+      {/* Countdown Timer (only shown when from=registration) */}
+      {showCountdown && (
+        <div className="p-4 border rounded-xl bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-orange-600" />
+              <div>
+                <p className="font-semibold text-orange-900 dark:text-orange-100">
+                  Complete payment within 15 minutes
+                </p>
+                <p className="text-sm text-orange-700 dark:text-orange-300">
+                  Your spot is reserved. Pay now to confirm your registration.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-orange-600 tabular-nums">
+                {formatTime(timeLeft)}
+              </div>
+              <p className="text-xs text-orange-600">remaining</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Order Summary */}
       <div className="p-6 border rounded-xl bg-card shadow-sm">
         <h2 className="font-semibold text-lg mb-4">Order Summary</h2>
@@ -198,7 +253,43 @@ export function CheckoutForm({ registration }: CheckoutFormProps) {
               </>
             )}
           </Button>
+
+          {showCountdown && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  or
+                </span>
+              </div>
+            </div>
+          )}
+
+          {showCountdown && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              size="lg"
+              onClick={handlePayLater}
+              disabled={isProcessing}
+            >
+              Pay Later
+            </Button>
+          )}
         </form>
+
+        {showCountdown && (
+          <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              <strong>Pay Later:</strong> Your registration will remain pending. Payment deadline is{" "}
+              <strong>{formatDate(new Date(registration.session.startDate.getTime() - 7 * 24 * 60 * 60 * 1000))}</strong>{" "}
+              (7 days before session start).
+            </p>
+          </div>
+        )}
       </div>
 
       <p className="text-center text-sm text-muted-foreground">

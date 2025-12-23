@@ -531,6 +531,42 @@ export class FormService {
   }
 
   /**
+   * Unpublish a form (make it unavailable to users)
+   */
+  async unpublishForm(formId: string, userId: string) {
+    return db.transaction(async (tx) => {
+      const currentForm = await tx.query.formDefinitions.findFirst({
+        where: eq(formDefinitions.id, formId),
+        columns: { version: true },
+      });
+
+      if (!currentForm) {
+        throw new Error("Form not found");
+      }
+
+      const [form] = await tx
+        .update(formDefinitions)
+        .set({
+          isPublished: false,
+          status: "draft",
+          updatedAt: new Date(),
+        })
+        .where(eq(formDefinitions.id, formId))
+        .returning();
+
+      await tx.insert(events).values({
+        streamId: `form-${formId}`,
+        eventType: "FormUnpublished",
+        eventData: { formId, version: currentForm.version },
+        version: currentForm.version,
+        userId,
+      });
+
+      return form;
+    });
+  }
+
+  /**
    * Archive a form
    */
   async archiveForm(formId: string, userId: string) {

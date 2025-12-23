@@ -62,13 +62,19 @@ export function RegisterSessionDialog({
     setError(null);
 
     try {
-      await registerForSessionAction({
+      const result = await registerForSessionAction({
         childId: selectedChildId,
         sessionId: session.id,
       });
 
       setOpen(false);
-      router.refresh();
+
+      // Redirect to checkout page immediately after registration
+      if (result.success && result.registration) {
+        router.push(`/checkout/${result.registration.id}?from=registration`);
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Failed to register"
