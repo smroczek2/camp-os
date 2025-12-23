@@ -4,8 +4,8 @@ import { getAccountDetailsAction } from "@/app/actions/account-actions";
 import { AccountHeaderWithActions } from "@/components/admin/accounts/account-header-with-actions";
 import { AccountTabsNav } from "@/components/admin/accounts/account-tabs-nav";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 type Params = {
   accountId: string;
@@ -57,13 +57,13 @@ export default async function AccountDetailLayout({
     <div className="container mx-auto px-4 py-8">
       {/* Breadcrumbs */}
       <div className="mb-6">
-        <Link
-          href="/dashboard/admin/accounts"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Accounts
-        </Link>
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard/admin" },
+            { label: "Accounts", href: "/dashboard/admin/accounts" },
+            { label: accountWithStatus.name },
+          ]}
+        />
       </div>
 
       {/* Account Header with Actions */}

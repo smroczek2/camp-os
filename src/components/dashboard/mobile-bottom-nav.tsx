@@ -3,33 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import {
-    LayoutDashboard,
-    Users,
-    Calendar,
-} from "lucide-react";
+import { getDashboardNavItems, type DashboardRole } from "./dashboard-nav";
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ role }: { role?: DashboardRole }) {
     const pathname = usePathname();
 
-    const items = [
-        {
-            title: "Home",
-            href: "/dashboard/parent",
-            icon: LayoutDashboard,
-            matchExact: true,
-        },
-        {
-            title: "Family",
-            href: "/dashboard/parent/children",
-            icon: Users,
-        },
-        {
-            title: "Activity",
-            href: "/dashboard/parent/registrations",
-            icon: Calendar,
-        },
-    ];
+    const items = getDashboardNavItems(role).filter((item) => item.mobile);
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t md:hidden">

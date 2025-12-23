@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Users, Search } from "lucide-react";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 type SearchParams = {
   search?: string;
@@ -59,6 +60,13 @@ export default async function AccountsListPage({
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Accounts" },
+        ]}
+      />
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">

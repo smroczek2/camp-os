@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth-helper";
 import { db } from "@/lib/db";
-import { attendance, registrations } from "@/lib/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { attendance, registrations, assignments, groupMembers } from "@/lib/schema";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 // ============================================================================
@@ -76,6 +76,7 @@ export async function checkInChildAction(data: z.infer<typeof checkInSchema>) {
           .returning();
 
         revalidatePath("/dashboard/admin/attendance");
+        revalidatePath("/dashboard/staff/attendance");
         return { success: true, attendance: updated };
       } else {
         return { success: false, error: "Child is already checked in" };
@@ -109,6 +110,7 @@ export async function checkInChildAction(data: z.infer<typeof checkInSchema>) {
       .returning();
 
     revalidatePath("/dashboard/admin/attendance");
+    revalidatePath("/dashboard/staff/attendance");
     return { success: true, attendance: newAttendance };
   } catch (error) {
     console.error("Failed to check in child:", error);
@@ -163,6 +165,7 @@ export async function checkOutChildAction(data: z.infer<typeof checkOutSchema>) 
       .returning();
 
     revalidatePath("/dashboard/admin/attendance");
+    revalidatePath("/dashboard/staff/attendance");
     return { success: true, attendance: updated };
   } catch (error) {
     console.error("Failed to check out child:", error);
@@ -179,7 +182,7 @@ export async function getExpectedChildrenAction(
 ) {
   const session = await getSession();
 
-  if (!session?.user) {
+  if (!session?.user || !["admin", "staff"].includes(session.user.role)) {
     return { success: false, error: "Unauthorized", children: [] };
   }
 
@@ -196,12 +199,48 @@ export async function getExpectedChildrenAction(
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get all confirmed registrations for this session
+    let allowedChildIds: string[] | null = null;
+
+    if (session.user.role === "staff") {
+      const staffAssignments = await db.query.assignments.findMany({
+        where: and(
+          eq(assignments.staffId, session.user.id),
+          eq(assignments.sessionId, parsed.data.sessionId)
+        ),
+        columns: { groupId: true },
+      });
+
+      if (staffAssignments.length === 0) {
+        return { success: false, error: "Not assigned to this session", children: [] };
+      }
+
+      const groupIds = staffAssignments.map((assignment) => assignment.groupId);
+      const groupChildren = await db.query.groupMembers.findMany({
+        where: inArray(groupMembers.groupId, groupIds),
+        columns: { childId: true },
+      });
+
+      allowedChildIds = Array.from(
+        new Set(groupChildren.map((member) => member.childId))
+      );
+
+      if (allowedChildIds.length === 0) {
+        return { success: true, children: [] };
+      }
+    }
+
+    // Get confirmed registrations for this session
+    const registrationFilters = [
+      eq(registrations.sessionId, parsed.data.sessionId),
+      eq(registrations.status, "confirmed"),
+    ];
+
+    if (allowedChildIds) {
+      registrationFilters.push(inArray(registrations.childId, allowedChildIds));
+    }
+
     const sessionRegistrations = await db.query.registrations.findMany({
-      where: and(
-        eq(registrations.sessionId, parsed.data.sessionId),
-        eq(registrations.status, "confirmed")
-      ),
+      where: and(...registrationFilters),
       with: {
         child: true,
         user: true,

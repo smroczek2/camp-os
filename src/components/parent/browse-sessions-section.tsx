@@ -8,6 +8,7 @@ import { RegisterSessionDialog } from "@/components/parent/register-session-dial
 import { JoinWaitlistButton } from "@/components/parent/join-waitlist-button";
 import { formatDate, cn } from "@/lib/utils";
 import type { children } from "@/lib/schema";
+import Link from "next/link";
 
 type Child = typeof children.$inferSelect;
 
@@ -129,6 +130,16 @@ export function BrowseSessionsSection({
                                             {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} remaining
                                         </p>
                                     </div>
+                                </div>
+
+                                <div className="flex items-center justify-between text-sm mb-4">
+                                    <Link
+                                        href={`/sessions/${campSession.id}`}
+                                        className="text-primary hover:underline flex items-center gap-1"
+                                    >
+                                        View details
+                                        <ArrowRight className="h-4 w-4" />
+                                    </Link>
                                 </div>
 
                                 {isOpen && spotsLeft > 0 ? (

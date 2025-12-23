@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, User, Calendar, FileText, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export default async function SubmissionDetailPage({
   params,
@@ -96,6 +97,16 @@ export default async function SubmissionDetailPage({
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Forms", href: "/dashboard/admin/forms" },
+          { label: submission.formDefinition.name, href: `/dashboard/admin/forms/${formId}` },
+          { label: "Submissions", href: `/dashboard/admin/forms/${formId}/submissions` },
+          { label: "Submission" },
+        ]}
+      />
+
       {/* Back Button */}
       <div className="mb-6">
         <Link href={`/dashboard/admin/forms/${formId}/submissions`}>

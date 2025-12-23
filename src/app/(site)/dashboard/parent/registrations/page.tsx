@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export default async function RegistrationsPage() {
     const session = await getSession();
@@ -50,6 +51,13 @@ export default async function RegistrationsPage() {
 
     return (
         <div>
+            <Breadcrumb
+                items={[
+                    { label: "Dashboard", href: "/dashboard/parent" },
+                    { label: "Registrations" },
+                ]}
+            />
+
             <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2">Registrations</h1>
                 <p className="text-muted-foreground">View your current and past camp enrollments.</p>
@@ -61,7 +69,7 @@ export default async function RegistrationsPage() {
                     <p className="text-muted-foreground mb-4">
                         No camp registrations found
                     </p>
-                    <Link href="/dashboard/parent/browse">
+                    <Link href="/dashboard/parent/sessions">
                         <Button>
                             Browse Available Sessions
                             <ArrowRight className="h-4 w-4 ml-2" />
@@ -77,7 +85,7 @@ export default async function RegistrationsPage() {
                                 {myRegistrations.map((registration) => (
                                     <div
                                         key={registration.id}
-                                        className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                                        className="p-6 border rounded-xl bg-card shadow-sm"
                                     >
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex-1">
@@ -140,7 +148,7 @@ export default async function RegistrationsPage() {
                                 {myWaitlistEntries.map((entry) => (
                                     <div
                                         key={entry.id}
-                                        className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                                        className="p-6 border rounded-xl bg-card shadow-sm"
                                     >
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex-1">
@@ -176,8 +184,8 @@ export default async function RegistrationsPage() {
                                             <div className="text-right">
                                                 <p className="text-xl font-bold">${entry.session.price}</p>
                                                 {entry.status === "offered" && (
-                                                    <Link href={`/dashboard/parent`}>
-                                                        {/* Ideally this would go to a specific accept flow, but for now redirecting to dash/browse is fine or we can assume there's a checkout flow */}
+                                                    <Link href="/dashboard/parent/sessions">
+                                                        {/* Redirect to sessions until a dedicated acceptance flow is added */}
                                                         <Button size="sm" className="mt-2">
                                                             Register Now
                                                             <ArrowRight className="h-4 w-4 ml-1" />

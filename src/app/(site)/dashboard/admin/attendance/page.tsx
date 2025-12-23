@@ -7,15 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Calendar,
   Users,
-  ChevronLeft,
   Clock,
   CheckCircle2,
   XCircle,
   UserCheck,
   UserX,
 } from "lucide-react";
-import Link from "next/link";
 import { CheckInListWrapper } from "@/components/admin/check-in-list-wrapper";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +25,7 @@ export default async function AttendanceDashboardPage() {
     redirect("/login");
   }
 
-  if (!["admin", "staff"].includes(session.user.role)) {
+  if (session.user.role !== "admin") {
     redirect("/dashboard");
   }
 
@@ -91,16 +90,15 @@ export default async function AttendanceDashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Attendance" },
+        ]}
+      />
+
       {/* Header */}
       <div className="mb-8">
-        <Link
-          href="/dashboard/admin"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Link>
-
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">Attendance Dashboard</h1>
@@ -222,7 +220,7 @@ export default async function AttendanceDashboardPage() {
               return (
                 <div
                   key={group.id}
-                  className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                  className="p-4 border rounded-xl bg-card shadow-sm"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>

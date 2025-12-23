@@ -190,10 +190,12 @@ export default async function AdminDashboard() {
               const fillRate = (confirmedCount / campSession.capacity) * 100;
 
               return (
-                <div
+                <Link
                   key={campSession.id}
-                  className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow"
+                  href={`/dashboard/admin/programs/${campSession.id}`}
+                  className="block"
                 >
+                  <div className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -221,7 +223,8 @@ export default async function AdminDashboard() {
                       </span>
                     </div>
                   </div>
-                </div>
+                  </div>
+                </Link>
               );
             })}
           </div>

@@ -23,6 +23,7 @@ import { FormHeader } from "./form-header";
 import { FormMetadataEditor } from "./form-metadata-editor";
 import { FormStats } from "./form-stats";
 import { FormFieldList } from "./form-field-list";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export function FormDetailsView({ form }: { form: FormDetails }) {
   const router = useRouter();
@@ -114,6 +115,14 @@ export function FormDetailsView({ form }: { form: FormDetails }) {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard/admin" },
+            { label: "Forms", href: "/dashboard/admin/forms" },
+            { label: form.name },
+          ]}
+        />
+
         <FormHeader
           formId={form.id}
           formName={form.name}

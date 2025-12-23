@@ -9,6 +9,7 @@ import { Users } from "lucide-react";
 import { MedicationForm } from "@/components/parent/medication-form";
 import { MedicalSummaryCard } from "@/components/parent/medical-summary-card";
 import { formatDate } from "@/lib/utils";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export default async function MyChildrenPage() {
     const session = await getSession();
@@ -43,6 +44,13 @@ export default async function MyChildrenPage() {
 
     return (
         <div>
+            <Breadcrumb
+                items={[
+                    { label: "Dashboard", href: "/dashboard/parent" },
+                    { label: "Children" },
+                ]}
+            />
+
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-3xl font-bold mb-2">My Children</h1>

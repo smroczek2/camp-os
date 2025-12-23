@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Download } from "lucide-react";
 import Link from "next/link";
 import { SubmissionsListClient } from "@/components/admin/submissions-list-client";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export default async function FormSubmissionsPage({
   params,
@@ -58,26 +59,18 @@ export default async function FormSubmissionsPage({
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Forms", href: "/dashboard/admin/forms" },
+          { label: formConfig.name, href: `/dashboard/admin/forms/${formId}` },
+          { label: "Submissions" },
+        ]}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Link
-              href="/dashboard/admin/forms"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Forms
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <Link
-              href={`/dashboard/admin/forms/${formId}`}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {formConfig.name}
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-sm">Submissions</span>
-          </div>
           <h1 className="text-4xl font-bold mb-2">Form Submissions</h1>
           <p className="text-muted-foreground">
             View and manage submissions for {formConfig.name}

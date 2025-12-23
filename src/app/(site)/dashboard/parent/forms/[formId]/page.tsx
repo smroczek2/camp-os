@@ -11,6 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { CheckCircle2, Calendar, ArrowLeft, FileText } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export default async function ParentFormPage({
   params,
@@ -81,6 +82,14 @@ export default async function ParentFormPage({
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
+          <Breadcrumb
+            items={[
+              { label: "Dashboard", href: "/dashboard/parent" },
+              { label: "Forms", href: "/dashboard/parent/forms" },
+              { label: formConfig.name },
+            ]}
+          />
+
           {/* Back Button */}
           <div className="mb-6">
             <Link href="/dashboard/parent">
@@ -176,6 +185,14 @@ export default async function ParentFormPage({
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-2xl mx-auto">
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard/parent" },
+            { label: "Forms", href: "/dashboard/parent/forms" },
+            { label: formConfig.name },
+          ]}
+        />
+
         {/* Back Button */}
         <div className="mb-6">
           <Link href="/dashboard/parent">

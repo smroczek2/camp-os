@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Pill, Activity, Users, Clock } from "lucide-react";
 import { MedicationLogForm } from "@/components/nurse/medication-log-form";
 import { and, lte, or, isNull, gte, desc } from "drizzle-orm";
+import Link from "next/link";
 
 export default async function NurseDashboard() {
   const session = await getSession();
@@ -219,9 +220,12 @@ export default async function NurseDashboard() {
                       <p className="font-semibold">
                         {med.child.firstName} {med.child.lastName}
                       </p>
-                      <p className="text-lg font-medium text-blue-600 mt-1">
+                      <Link
+                        href={`/dashboard/nurse/medications/${med.id}`}
+                        className="text-lg font-medium text-blue-600 mt-1 inline-block hover:underline"
+                      >
                         {med.name}
-                      </p>
+                      </Link>
                     </div>
                     {isAdministeredToday && (
                       <Badge variant="outline" className="bg-green-100 dark:bg-green-900">
@@ -325,10 +329,12 @@ export default async function NurseDashboard() {
         ) : (
           <div className="space-y-4">
             {recentLogs.map((log) => (
-              <div
+              <Link
                 key={log.id}
-                className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                href={`/dashboard/nurse/medications/${log.medication.id}`}
+                className="block"
               >
+                <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -352,7 +358,8 @@ export default async function NurseDashboard() {
                     )}
                   </div>
                 </div>
-              </div>
+                </div>
+              </Link>
             ))}
           </div>
         )}
@@ -372,10 +379,12 @@ export default async function NurseDashboard() {
         ) : (
           <div className="space-y-4">
             {recentIncidents.map((incident) => (
-              <div
+              <Link
                 key={incident.id}
-                className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                href={`/dashboard/nurse/incidents/${incident.id}`}
+                className="block"
               >
+                <div className="p-4 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -419,7 +428,8 @@ export default async function NurseDashboard() {
                     )}
                   </div>
                 </div>
-              </div>
+                </div>
+              </Link>
             ))}
           </div>
         )}

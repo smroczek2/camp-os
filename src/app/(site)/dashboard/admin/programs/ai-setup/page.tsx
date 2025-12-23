@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth-helper";
 import { AISetupChat } from "@/components/admin/ai-setup/ai-chat";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,14 @@ export default async function AISetupPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/admin" },
+          { label: "Sessions", href: "/dashboard/admin/programs" },
+          { label: "AI Setup" },
+        ]}
+      />
+
       <div className="mb-6">
         <Link
           href="/dashboard/admin/programs"

@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Clock,
   User,
-  Calendar,
   FileText,
 } from "lucide-react";
 import { ResolveIncidentForm } from "@/components/admin/resolve-incident-form";
@@ -54,7 +53,7 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-export default async function IncidentDetailPage({ params }: Props) {
+export default async function NurseIncidentDetailPage({ params }: Props) {
   const { id } = await params;
   const session = await getSession();
 
@@ -62,7 +61,7 @@ export default async function IncidentDetailPage({ params }: Props) {
     redirect("/login");
   }
 
-  if (session.user.role !== "admin" && session.user.role !== "nurse") {
+  if (session.user.role !== "nurse") {
     redirect("/dashboard");
   }
 
@@ -86,17 +85,16 @@ export default async function IncidentDetailPage({ params }: Props) {
   const Icon = config.icon;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-8">
-        <Breadcrumb
-          items={[
-            { label: "Dashboard", href: "/dashboard/admin" },
-            { label: "Incidents", href: "/dashboard/admin/incidents" },
-            { label: "Incident" },
-          ]}
-        />
+    <div className="max-w-4xl mx-auto">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard/nurse" },
+          { label: "Incidents", href: "/dashboard/nurse/incidents" },
+          { label: "Incident" },
+        ]}
+      />
 
+      <div className="mb-8">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
             <div
@@ -139,9 +137,7 @@ export default async function IncidentDetailPage({ params }: Props) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Incident Details */}
           <div className="border rounded-xl bg-card shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -193,7 +189,6 @@ export default async function IncidentDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Resolution Section */}
           <div className="border rounded-xl bg-card shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5" />
@@ -212,9 +207,7 @@ export default async function IncidentDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Child Info */}
           <div className="border rounded-xl bg-card shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -240,21 +233,16 @@ export default async function IncidentDetailPage({ params }: Props) {
                 </p>
               </div>
 
-              {incident.child.allergies &&
-                incident.child.allergies.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Allergies
-                    </label>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {incident.child.allergies.map((allergy: string, idx: number) => (
-                        <Badge key={idx} variant="destructive">
-                          {allergy}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              {incident.child.allergies && incident.child.allergies.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Allergies
+                  </label>
+                  <p className="mt-1 text-red-600">
+                    {incident.child.allergies.join(", ")}
+                  </p>
+                </div>
+              )}
 
               {incident.child.medicalNotes && (
                 <div>
@@ -262,51 +250,6 @@ export default async function IncidentDetailPage({ params }: Props) {
                     Medical Notes
                   </label>
                   <p className="mt-1 text-sm">{incident.child.medicalNotes}</p>
-                </div>
-              )}
-
-              {incident.child.medications &&
-                incident.child.medications.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Medications
-                    </label>
-                    <ul className="mt-1 space-y-1">
-                      {incident.child.medications.map((med) => (
-                        <li key={med.id} className="text-sm">
-                          <span className="font-medium">{med.name}</span> -{" "}
-                          {med.dosage}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* Reporter Info */}
-          <div className="border rounded-xl bg-card shadow-sm p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Reported By
-            </h2>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Staff Member
-                </label>
-                <p className="mt-1 font-medium">
-                  {incident.reporter?.name || "Unknown"}
-                </p>
-              </div>
-
-              {incident.reporter?.email && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Email
-                  </label>
-                  <p className="mt-1 text-sm">{incident.reporter.email}</p>
                 </div>
               )}
             </div>

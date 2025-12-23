@@ -1,10 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Calendar, Users as UsersIcon } from "lucide-react";
+import { Calendar, Users as UsersIcon, ArrowRight } from "lucide-react";
 import { RegisterSessionDialog } from "@/components/parent/register-session-dialog";
 import { JoinWaitlistButton } from "@/components/parent/join-waitlist-button";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 interface Child {
   id: string;
@@ -130,6 +131,16 @@ export function FeaturedSessionsSection({
                     {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} remaining
                   </p>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm mb-4">
+                <Link
+                  href={`/sessions/${campSession.id}`}
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
+                  View details
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
 
               {isOpen && spotsLeft > 0 ? (

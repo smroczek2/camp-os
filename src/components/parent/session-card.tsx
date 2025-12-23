@@ -2,9 +2,10 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, DollarSign, Users } from "lucide-react";
+import { Calendar, DollarSign, Users, ArrowRight } from "lucide-react";
 import { getEligibilitySummary } from "@/services/eligibility-service";
 import { SessionEligibilityDisplay } from "./session-eligibility-display";
+import Link from "next/link";
 
 interface Child {
   id: string;
@@ -86,6 +87,16 @@ export function SessionCard({ session, children, onRegister }: SessionCardProps)
             {eligibilitySummary}
           </div>
         )}
+
+        <div className="text-sm">
+          <Link
+            href={`/sessions/${session.id}`}
+            className="text-primary hover:underline inline-flex items-center gap-1"
+          >
+            View details
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
 
         {/* Children Eligibility */}
         {session.status === "open" && (

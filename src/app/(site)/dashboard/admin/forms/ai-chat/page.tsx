@@ -33,6 +33,7 @@ import type {
   AIFormGeneration,
   GeneratedFormResult,
 } from "@/types/forms";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
 
 type Message = {
   role: "user" | "assistant";
@@ -151,6 +152,14 @@ export default function AIFormChat() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard/admin" },
+            { label: "Forms", href: "/dashboard/admin/forms" },
+            { label: "AI Generator" },
+          ]}
+        />
+
         <div className="mb-6">
           <Link href="/dashboard/admin/forms" className="inline-flex">
             <Button variant="ghost" className="-ml-3">

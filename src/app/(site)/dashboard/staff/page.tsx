@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { assignments } from "@/lib/schema";
 import { Badge } from "@/components/ui/badge";
 import { Users, Calendar, AlertCircle, Activity } from "lucide-react";
+import Link from "next/link";
 
 export default async function StaffDashboard() {
   const session = await getSession();
@@ -102,10 +103,12 @@ export default async function StaffDashboard() {
         ) : (
           <div className="space-y-6">
             {myAssignments.map((assignment) => (
-              <div
+              <Link
                 key={assignment.id}
-                className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+                href={`/dashboard/staff/groups/${assignment.group.id}`}
+                className="block"
               >
+                <div className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
                 {/* Group Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -176,7 +179,8 @@ export default async function StaffDashboard() {
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              </Link>
             ))}
           </div>
         )}

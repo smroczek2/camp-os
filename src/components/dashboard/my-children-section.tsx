@@ -56,7 +56,7 @@ export function MyChildrenSection({
         return (
           <div
             key={child.id}
-            className="p-6 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow"
+            className="p-6 border rounded-xl bg-card shadow-sm"
           >
             <div className="flex items-start justify-between mb-4">
               <div>
