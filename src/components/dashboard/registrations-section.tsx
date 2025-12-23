@@ -42,12 +42,12 @@ export function RegistrationsSection({
         icon={Calendar}
         title="No camp registrations yet"
         action={
-          <Link href="#browse-sessions">
-            <Button>
+          <Button asChild>
+            <Link href="#browse-sessions">
               Browse Available Sessions
               <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         }
       />
     );
@@ -92,12 +92,12 @@ export function RegistrationsSection({
               {registration.amountPaid ? (
                 <p className="text-sm text-green-600">Paid</p>
               ) : registration.status === "pending" ? (
-                <Link href={`/checkout/${registration.id}`}>
-                  <Button size="sm" className="mt-2">
+                <Button asChild size="sm" className="mt-2">
+                  <Link href={`/checkout/${registration.id}`}>
                     Pay Now
                     <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               ) : null}
             </div>
           </div>

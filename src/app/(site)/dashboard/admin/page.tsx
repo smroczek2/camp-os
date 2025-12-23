@@ -166,20 +166,18 @@ export default async function AdminDashboard() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Sessions</h2>
-          <Link href="/dashboard/admin/programs">
-            <Button variant="outline" size="sm">
-              View All
-            </Button>
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/admin/programs">View All</Link>
+          </Button>
         </div>
 
         {recentSessions.length === 0 ? (
           <div className="text-center p-12 border rounded-xl bg-muted/30">
             <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">No sessions created yet</p>
-            <Link href="/dashboard/admin/programs" className="mt-4 inline-block">
-              <Button>Create Your First Session</Button>
-            </Link>
+            <Button asChild className="mt-4">
+              <Link href="/dashboard/admin/programs">Create Your First Session</Link>
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">

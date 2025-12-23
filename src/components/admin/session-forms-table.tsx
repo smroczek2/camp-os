@@ -47,9 +47,9 @@ export function SessionFormsTable({ forms }: SessionFormsTableProps) {
           <p className="text-sm text-muted-foreground">
             Create forms in the Form Builder and assign them to this session.
           </p>
-          <Link href="/dashboard/admin/forms/ai-chat">
-            <Button className="mt-4">Create Form</Button>
-          </Link>
+          <Button asChild className="mt-4">
+            <Link href="/dashboard/admin/forms/ai-chat">Create Form</Link>
+          </Button>
         </div>
       </div>
     );
@@ -62,11 +62,9 @@ export function SessionFormsTable({ forms }: SessionFormsTableProps) {
           <FileText className="h-5 w-5" />
           Forms ({forms.length})
         </h2>
-        <Link href="/dashboard/admin/forms">
-          <Button variant="outline" size="sm">
-            View All Forms
-          </Button>
-        </Link>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/dashboard/admin/forms">View All Forms</Link>
+        </Button>
       </div>
       <Table>
         <TableHeader>
@@ -106,11 +104,11 @@ export function SessionFormsTable({ forms }: SessionFormsTableProps) {
               </TableCell>
               <TableCell>
                 <div className="flex gap-2">
-                  <Link href={`/dashboard/admin/forms/${form.id}`}>
-                    <Button variant="ghost" size="sm">
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/dashboard/admin/forms/${form.id}`}>
                       <Eye className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>

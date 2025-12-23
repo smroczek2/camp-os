@@ -62,20 +62,20 @@ export function ActionItemsSection({
               </div>
               <div>
                 {!isCompleted && (
-                  <Link href={`/dashboard/parent/forms/${form.id}`}>
-                    <Button>
+                  <Button asChild>
+                    <Link href={`/dashboard/parent/forms/${form.id}`}>
                       Complete Form
                       <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 )}
                 {isCompleted && (
-                  <Link href={`/dashboard/parent/forms/${form.id}`}>
-                    <Button variant="outline">
+                  <Button asChild variant="outline">
+                    <Link href={`/dashboard/parent/forms/${form.id}`}>
                       View Submission
                       <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 )}
               </div>
             </div>
